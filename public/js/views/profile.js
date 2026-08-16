@@ -1,0 +1,87 @@
+import { bootPage, setMotionPreference, setContrastPreference } from "../app.js";
+import { getProfile, updateProfile } from "../db/profile-store.js";
+import { linkEmail } from "../api-client.js";
+
+async function loadIntoForm() {
+  const profile = await getProfile();
+  if (!profile) return;
+  document.getElementById("profile-name").value = profile.name || "";
+  document.getElementById("profile-due-date").value = profile.dueDate || "";
+  document.getElementById("profile-week").value = profile.currentWeek || "";
+  document.getElementById("pref-dispatch-updates").checked = !!profile.notificationPrefs?.dispatchUpdates;
+  document.getElementById("pref-comfort-reminders").checked = !!profile.notificationPrefs?.comfortReminders;
+  document.getElementById("pref-safe-notes").checked = !!profile.pregnancySafeNotesEnabled;
+  document.getElementById("pref-reduced-motion").checked = localStorage.getItem("cc.motion") === "reduced";
+  document.getElementById("pref-high-contrast").checked = localStorage.getItem("cc.contrast") === "high";
+  renderLinkStatus(profile);
+}
+
+function renderLinkStatus(profile) {
+  const statusEl = document.getElementById("link-status");
+  const formEl = document.getElementById("link-form");
+  if (profile.linkedEmail && profile.emailLinkedAt) {
+    statusEl.textContent = `Linked to ${profile.linkedEmail}. You can open Crave & Care on another device and sign in with this email to see your data there.`;
+    formEl.hidden = true;
+  } else if (profile.linkedEmail) {
+    statusEl.textContent = `Almost there — check ${profile.linkedEmail} for a confirmation link.`;
+  } else {
+    statusEl.textContent = "Not linked yet — this is entirely optional.";
+  }
+}
+
+function wireSave() {
+  document.getElementById("save-profile").addEventListener("click", async () => {
+    await updateProfile({
+      name: document.getElementById("profile-name").value.trim(),
+      dueDate: document.getElementById("profile-due-date").value || null,
+      currentWeek: document.getElementById("profile-week").value ? Number(document.getElementById("profile-week").value) : null,
+      notificationPrefs: {
+        dispatchUpdates: document.getElementById("pref-dispatch-updates").checked,
+        comfortReminders: document.getElementById("pref-comfort-reminders").checked,
+      },
+      pregnancySafeNotesEnabled: document.getElementById("pref-safe-notes").checked,
+    });
+  });
+
+  document.getElementById("pref-reduced-motion").addEventListener("change", (e) => {
+    setMotionPreference(e.target.checked ? "reduced" : "full");
+  });
+  document.getElementById("pref-high-contrast").addEventListener("change", (e) => {
+    setContrastPreference(e.target.checked ? "high" : "normal");
+  });
+}
+
+function wireEmailLink() {
+  document.getElementById("link-email-btn").addEventListener("click", async () => {
+    const email = document.getElementById("link-email").value.trim();
+    const statusEl = document.getElementById("link-status");
+    if (!email) return;
+    statusEl.textContent = "Sending a confirmation link...";
+    // Normal app use is never blocked while this is pending (FR-031) — this call simply runs
+    // in the background and the rest of the page stays fully usable either way.
+    const { error } = await linkEmail(email);
+    if (error) {
+      statusEl.textContent = "That didn't quite go through — want to try again?";
+      return;
+    }
+    await updateProfile({ linkedEmail: email, emailLinkedAt: null });
+    statusEl.textContent = `Almost there — check ${email} for a confirmation link.`;
+  });
+
+  window.addEventListener("cc:auth-changed", async () => {
+    const profile = await getProfile();
+    if (profile?.linkedEmail && !profile.emailLinkedAt) {
+      await updateProfile({ emailLinkedAt: new Date().toISOString() });
+    }
+    loadIntoForm();
+  });
+}
+
+async function main() {
+  await bootPage();
+  await loadIntoForm();
+  wireSave();
+  wireEmailLink();
+}
+
+main();

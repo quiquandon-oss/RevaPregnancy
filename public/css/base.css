@@ -80,6 +80,13 @@ textarea {
   color: inherit;
 }
 
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--color-primary);
+  width: 20px;
+  height: 20px;
+}
+
 button {
   cursor: pointer;
 }

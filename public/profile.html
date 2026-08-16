@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Profile — Crave & Care</title>
+    <meta name="theme-color" content="#8fae8b" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="css/tokens.css" />
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/components.css" />
+  </head>
+  <body>
+    <main class="app-main stack">
+      <h1>Profile & Preferences</h1>
+
+      <div class="field">
+        <label for="profile-name">Name</label>
+        <input type="text" id="profile-name" />
+      </div>
+      <div class="field">
+        <label for="profile-due-date">Due date</label>
+        <input type="date" id="profile-due-date" />
+      </div>
+      <div class="field">
+        <label for="profile-week">Current week</label>
+        <input type="number" id="profile-week" min="1" max="42" />
+      </div>
+
+      <div class="field">
+        <label class="row"><input type="checkbox" id="pref-dispatch-updates" /> Notify me about dispatch updates</label>
+        <label class="row"><input type="checkbox" id="pref-comfort-reminders" /> Gentle comfort check-in reminders</label>
+        <label class="row"><input type="checkbox" id="pref-safe-notes" /> Show optional pregnancy-safe notes</label>
+      </div>
+
+      <div class="field">
+        <label class="row"><input type="checkbox" id="pref-reduced-motion" /> Reduced motion</label>
+        <label class="row"><input type="checkbox" id="pref-high-contrast" /> High contrast</label>
+      </div>
+
+      <button class="btn btn-primary btn-block" id="save-profile">Save</button>
+
+      <a class="btn btn-outline btn-block" href="support-network.html">Support Network</a>
+
+      <section class="card stack">
+        <h2>Back up my account</h2>
+        <p class="micro" id="link-status">Not linked yet — this is entirely optional.</p>
+        <div id="link-form" class="stack">
+          <div class="field">
+            <label for="link-email">Email (no password needed)</label>
+            <input type="email" id="link-email" placeholder="you@example.com" />
+          </div>
+          <button class="btn btn-outline btn-block" id="link-email-btn">Link this email</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>About this app</h2>
+        <p class="micro">
+          Crave & Care is here to support you, not to diagnose or treat anything. It isn't a
+          medical device and doesn't replace advice from your midwife or doctor.
+        </p>
+      </section>
+    </main>
+
+    <script type="module" src="js/views/profile.js"></script>
+  </body>
+</html>

@@ -79,12 +79,43 @@ function registerServiceWorker() {
 
 // Handles the "resume on a second device" magic-link callback (research.md #8, contracts/api.md).
 // Supabase appends auth tokens to the URL hash/query on redirect back from the emailed link;
-// supabase-js's detectSessionInUrl (on by default) completes the sign-in automatically. We just
-// need to react to the resulting auth state change to know a *different* identity just loaded.
+// supabase-js's detectSessionInUrl (on by default) completes the sign-in automatically. We react
+// to the resulting auth state change — first by telling every page a link/sign-in just
+// completed (profile.js listens for this to mark its own "linked" status), and separately, only
+// when this device has no local profile yet, by pulling down the existing Supabase-synced data
+// (dispatches, support-network members, comfort entries) so a genuinely new device ends up
+// showing the same data as the original one, per contracts/api.md's account-linking contract.
+async function handleResumeOnNewDevice(ownerId) {
+  const existingProfile = await getProfile();
+  if (existingProfile) return; // "link my current device" path — it already has all its data
+
+  const [{ refreshOwnerDispatches }, { refreshFromServer }, { refreshSupportNetwork }, { createProfile, acknowledgeDisclaimer }] =
+    await Promise.all([
+      import("./db/dispatch-store.js"),
+      import("./db/comfort-store.js"),
+      import("./db/support-store.js"),
+      import("./db/profile-store.js"),
+    ]);
+
+  await Promise.all([refreshOwnerDispatches(ownerId), refreshFromServer(), refreshSupportNetwork(ownerId)]);
+
+  // Local-only profile fields (name, due date) never left the original device, so this device
+  // needs a placeholder shell — the disclaimer was already acknowledged once by this same
+  // person, so it isn't shown again as a blocking step (FR-025 only requires it once, not once
+  // per device).
+  await createProfile({ name: "", dueDate: null, currentWeek: null });
+  await acknowledgeDisclaimer();
+
+  if (currentPage() !== "profile.html") window.location.href = "profile.html";
+}
+
 function watchAuthState() {
-  onAuthStateChange((event) => {
+  onAuthStateChange(async (event, session) => {
     if (event === "SIGNED_IN" || event === "USER_UPDATED") {
       window.dispatchEvent(new CustomEvent("cc:auth-changed", { detail: { event } }));
+      if (event === "SIGNED_IN" && session?.user?.id && !session.user.is_anonymous) {
+        await handleResumeOnNewDevice(session.user.id);
+      }
     }
   });
 }

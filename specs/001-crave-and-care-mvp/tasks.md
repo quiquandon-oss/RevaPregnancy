@@ -263,24 +263,24 @@ across two devices).
 
 ### Implementation for User Story 5
 
-- [ ] T052 [P] [US5] Build `public/onboarding.html`: welcome step (including an "I've used
+- [X] T052 [P] [US5] Build `public/onboarding.html`: welcome step (including an "I've used
       Crave & Care before" path into the sign-in flow for returning users), name +
       due-date/current-week step, optional skippable partner-invite step (links into US4's
       invite creation), a brief design/tone preview, and the disclaimer-acknowledgment step, per
       blueprint screen S-01
-- [ ] T053 [US5] Implement `public/js/views/onboarding.js`: step navigation, saving the `User`
+- [X] T053 [US5] Implement `public/js/views/onboarding.js`: step navigation, saving the `User`
       profile to `localStorage` per data-model.md, recording disclaimer acknowledgment,
       redirecting to Home on completion, and wiring the "I've used Crave & Care before" path to
       `supabase.auth.signInWithOtp({ email })` per contracts/api.md (depends on T014, T052)
-- [ ] T054 [P] [US5] Build `public/profile.html`: name/due-date/current-week/notification
+- [X] T054 [P] [US5] Build `public/profile.html`: name/due-date/current-week/notification
       preference fields, a link to Support Network, the disclaimer text kept reachable, and a
       "back up my account" section (optional email field + link-status indicator: not linked /
       confirmation pending / linked), per blueprint screen P-01
-- [ ] T055 [US5] Implement `public/js/views/profile.js`: load/edit/save profile fields and
+- [X] T055 [US5] Implement `public/js/views/profile.js`: load/edit/save profile fields and
       notification preferences, link through to `support-network.html`, and implement the
       optional email-link flow via `supabase.auth.updateUser({ email })` (FR-031), reflecting
       link status from `supabase.auth.onAuthStateChange` (depends on T014, T054)
-- [ ] T056 [US5] Implement the magic-link confirmation handler (shared code in `app.js`,
+- [X] T056 [US5] Implement the magic-link confirmation handler (shared code in `app.js`,
       triggered on any page load that carries a Supabase auth callback): complete the
       email-link/sign-in, and — specifically for the "resume on a second device" path (not the
       "link my current device" path, which already has all its own data) — pull the user's
@@ -288,10 +288,10 @@ across two devices).
       the local cache, then prompt for the local-only profile fields (name, due date) that don't
       travel with the account, per contracts/api.md's noted limitation (depends on T014, T019,
       T032, T047, T053, T055)
-- [ ] T057 [US5] Ensure normal use of every other feature (dispatch, comfort, appointments)
+- [X] T057 [US5] Ensure normal use of every other feature (dispatch, comfort, appointments)
       remains fully available and unaffected while an email link is "pending" but not yet
       confirmed, per FR-031's "never required" clause (depends on T055)
-- [ ] T058 [US5] Wire the real disclaimer gate in `public/js/app.js`: any page load redirects to
+- [X] T058 [US5] Wire the real disclaimer gate in `public/js/app.js`: any page load redirects to
       `onboarding.html` when `disclaimerAcknowledgedAt` is unset (depends on T016, T053)
 
 **Checkpoint**: All five user stories are independently functional.

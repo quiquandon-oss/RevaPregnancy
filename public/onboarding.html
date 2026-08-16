@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Welcome — Crave & Care</title>
+    <meta name="theme-color" content="#8fae8b" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="css/tokens.css" />
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/components.css" />
+  </head>
+  <body>
+    <main class="app-main stack">
+      <!-- Step 1: Welcome -->
+      <section class="onboarding-step stack" data-step="welcome">
+        <h1>Welcome to Crave & Care</h1>
+        <p>A calm, supportive place for cravings and comfort, whenever you need it.</p>
+        <button class="btn btn-primary btn-block" data-next>Get started</button>
+        <button class="btn btn-outline btn-block" id="returning-user-link">I've used Crave & Care before</button>
+      </section>
+
+      <!-- Returning user: sign in by email -->
+      <section class="onboarding-step stack" data-step="sign-in" hidden>
+        <h1>Welcome back</h1>
+        <p>Enter the email you linked before, and we'll send you a link to continue right where you left off.</p>
+        <div class="field">
+          <label for="sign-in-email">Email</label>
+          <input type="email" id="sign-in-email" placeholder="you@example.com" />
+        </div>
+        <button class="btn btn-primary btn-block" id="send-sign-in-link">Send my link</button>
+        <p id="sign-in-status" class="micro" hidden></p>
+        <button class="btn btn-outline btn-block" data-back>Back</button>
+      </section>
+
+      <!-- Step 2: Name + due date -->
+      <section class="onboarding-step stack" data-step="profile" hidden>
+        <h1>A little about you</h1>
+        <div class="field">
+          <label for="onboarding-name">What should we call you?</label>
+          <input type="text" id="onboarding-name" placeholder="Your name" />
+        </div>
+        <div class="field">
+          <label for="onboarding-due-date">Due date (or leave blank to enter your current week)</label>
+          <input type="date" id="onboarding-due-date" />
+        </div>
+        <div class="field">
+          <label for="onboarding-week">Current week (optional, if you'd rather)</label>
+          <input type="number" id="onboarding-week" min="1" max="42" />
+        </div>
+        <button class="btn btn-primary btn-block" data-next>Continue</button>
+      </section>
+
+      <!-- Step 3: Optional partner invite -->
+      <section class="onboarding-step stack" data-step="invite" hidden>
+        <h1>Bring someone along? (optional)</h1>
+        <p>You can invite a partner or someone you trust to help with cravings — or skip this for now and do it anytime from Support Network.</p>
+        <button class="btn btn-primary btn-block" id="invite-now">Invite someone now</button>
+        <button class="btn btn-outline btn-block" data-next>Skip for now</button>
+      </section>
+
+      <!-- Step 4: Design/tone preview -->
+      <section class="onboarding-step stack" data-step="preview" hidden>
+        <h1>A quick look</h1>
+        <div class="card">
+          <p>This is what a gentle nudge looks like around here — no pressure, just support.</p>
+        </div>
+        <div class="category-grid">
+          <div class="category-card"><span class="category-icon" aria-hidden="true">🍟</span><span>Salty</span></div>
+          <div class="category-card"><span class="category-icon" aria-hidden="true">🍦</span><span>Sweet</span></div>
+          <div class="category-card"><span class="category-icon" aria-hidden="true">🍋</span><span>Sour</span></div>
+        </div>
+        <button class="btn btn-primary btn-block" data-next>Continue</button>
+      </section>
+
+      <!-- Step 5: Disclaimer -->
+      <section class="onboarding-step stack" data-step="disclaimer" hidden>
+        <h1>Before you start</h1>
+        <div class="card">
+          <p>
+            Crave & Care is here to support you, not to diagnose or treat anything. It isn't a
+            medical device and doesn't replace advice from your midwife or doctor. If something
+            feels urgent, please reach out to your care provider directly.
+          </p>
+        </div>
+        <label class="row">
+          <input type="checkbox" id="disclaimer-checkbox" />
+          I understand
+        </label>
+        <button class="btn btn-primary btn-block" id="finish-onboarding" disabled>Start using Crave & Care</button>
+      </section>
+    </main>
+
+    <script type="module" src="js/views/onboarding.js"></script>
+  </body>
+</html>
