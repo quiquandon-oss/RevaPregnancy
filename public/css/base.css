@@ -127,6 +127,14 @@ button {
   gap: var(--space-3);
 }
 
+/* A checkbox/radio's own glyph is small, but its clickable row (the whole label, since the
+   input is wrapped by it) must still meet the touch-target minimum. */
+label.row,
+label.checklist-item {
+  min-height: var(--touch-target-min);
+  cursor: pointer;
+}
+
 .row-between {
   display: flex;
   align-items: center;

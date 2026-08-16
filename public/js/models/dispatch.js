@@ -29,7 +29,7 @@ export function validateDispatchInput({ category, intensity, fulfiller, assigned
   const errors = [];
   if (!CATEGORIES.includes(category)) errors.push("Choose a craving category.");
   if (!Number.isInteger(intensity) || intensity < 1 || intensity > 5) {
-    errors.push("Intensity should be a number from 1 to 5.");
+    errors.push("Pick an intensity from 1 to 5.");
   }
   if (!["self", "support_member"].includes(fulfiller)) errors.push("Choose who this is for.");
   if (fulfiller === "support_member" && !assignedMemberId) {

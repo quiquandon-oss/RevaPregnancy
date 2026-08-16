@@ -302,19 +302,19 @@ across two devices).
 
 **Purpose**: Constitution compliance and finishing touches across all stories.
 
-- [ ] T059 [P] Accessibility pass: verify WCAG 2.1 AA contrast for every color pairing in
+- [X] T059 [P] Accessibility pass: verify WCAG 2.1 AA contrast for every color pairing in
       `tokens.css`, confirm all interactive elements in `components.css` meet the 48px touch
       target minimum, and add reduced-motion and high-contrast mode toggles (FR-029)
-- [ ] T060 [P] Add voice input support (via the Web Speech API where available, with a visible
+- [X] T060 [P] Add voice input support (via the Web Speech API where available, with a visible
       fallback) to the custom-item field in `public/js/views/dispatch.js` and the question field
       in `public/js/views/care.js` (FR-029)
-- [ ] T061 Copy pass across every `public/*.html` page and view module for constitution
+- [X] T061 Copy pass across every `public/*.html` page and view module for constitution
       Principle I compliance: no "should/must/avoid" phrasing, no clinical or alarmist tone
       (FR-028)
-- [ ] T062 Finalize `public/service-worker.js`'s cached-asset list to cover every page and shared
+- [X] T062 Finalize `public/service-worker.js`'s cached-asset list to cover every page and shared
       CSS/JS file added in Phases 3-7, so the full app shell works offline (depends on all of
       Phase 3-7's HTML/CSS/JS files existing)
-- [ ] T063 [P] Update the root `README.md` with setup/run instructions, a design-token summary,
+- [X] T063 [P] Update the root `README.md` with setup/run instructions, a design-token summary,
       and a component inventory, per the product blueprint's §12 deliverables
 - [ ] T064 Run the full `quickstart.md` validation guide end-to-end (all five user stories, the
       cross-device account-linking check in its §8, and the cross-cutting checks in its §9) and

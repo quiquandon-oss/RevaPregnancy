@@ -32,12 +32,12 @@
 }
 
 .btn-primary {
-  background: var(--color-primary);
+  background: var(--color-primary-dark);
   color: var(--color-white);
 }
 
 .btn-primary:hover {
-  background: var(--color-primary-dark);
+  background: #4a6647;
 }
 
 .btn-outline {
@@ -171,7 +171,7 @@
 }
 
 .segmented__option[aria-pressed="true"] {
-  background: var(--color-primary);
+  background: var(--color-primary-dark);
   color: var(--color-white);
 }
 
@@ -236,8 +236,8 @@
 }
 
 .checklist-item[data-completed="true"] .checklist-item__check {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
+  background: var(--color-primary-dark);
+  border-color: var(--color-primary-dark);
   color: var(--color-white);
 }
 

@@ -1,26 +1,71 @@
 // App-shell offline caching (constitution Principle V: offline-first). No Workbox — plain
-// Cache API. Core shell assets are precached on install; everything else same-origin is cached
-// as it's visited (stale-while-revalidate), so pages built in later phases get covered
-// automatically without editing this file every time (T062 in Polish revisits the precache list).
+// Cache API. Every page and shared CSS/JS file is precached on install (T062), so the whole
+// app shell works offline from the very first launch, not just pages visited so far; anything
+// not listed here (e.g. a future page) still gets covered at runtime via stale-while-revalidate.
 
-const CACHE_NAME = "crave-and-care-v1";
+const CACHE_NAME = "crave-and-care-v2";
 
 const CORE_ASSETS = [
+  // Pages
   "index.html",
+  "dispatch.html",
+  "comfort.html",
+  "care.html",
+  "appointment-edit.html",
+  "profile.html",
+  "support-network.html",
+  "partner.html",
+  "onboarding.html",
   "manifest.webmanifest",
+  // CSS
   "css/tokens.css",
   "css/base.css",
   "css/components.css",
+  // Shared JS
   "js/app.js",
   "js/api-client.js",
+  "js/identity.js",
   "js/db/local-store.js",
   "js/db/sync-queue.js",
   "js/db/profile-store.js",
+  "js/db/dispatch-store.js",
+  "js/db/comfort-store.js",
+  "js/db/appointment-store.js",
+  "js/db/support-store.js",
+  "js/data/comfort-statuses.js",
+  // Models
+  "js/models/dispatch.js",
+  "js/models/comfort-entry.js",
+  "js/models/appointment.js",
+  "js/models/question.js",
+  "js/models/support-member.js",
+  // Views
+  "js/views/home.js",
+  "js/views/dispatch.js",
+  "js/views/comfort.js",
+  "js/views/care.js",
+  "js/views/appointment-edit.js",
+  "js/views/profile.js",
+  "js/views/support-network.js",
+  "js/views/partner.js",
+  "js/views/onboarding.js",
 ];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(CORE_ASSETS)).then(() => self.skipWaiting())
+    caches
+      .open(CACHE_NAME)
+      .then((cache) =>
+        // cache.addAll() fails atomically — one bad path would silently break offline caching
+        // for every asset, not just that one. Cache each asset independently instead, so a
+        // single miss can't take down the whole app shell.
+        Promise.all(
+          CORE_ASSETS.map((asset) =>
+            cache.add(asset).catch((error) => console.warn("service-worker: failed to precache", asset, error))
+          )
+        )
+      )
+      .then(() => self.skipWaiting())
   );
 });
 
