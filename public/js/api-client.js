@@ -11,10 +11,10 @@
 // absent client. This is what constitution Principle V (offline-first) requires: a page that
 // only needs local data must never be blocked by a network-dependent import failing.
 
-// Local dev defaults — printed by `supabase start` (see quickstart.md §2). Edit these two
-// constants to point at a deployed Supabase project instead.
-const SUPABASE_URL = "http://127.0.0.1:54321";
-const SUPABASE_ANON_KEY = "REPLACE_WITH_LOCAL_OR_PROJECT_ANON_KEY";
+// Points at the live "crave-and-care" Supabase project (see README.md). For local development
+// against `supabase start` instead, swap these for the URL/anon key it prints (quickstart.md §2).
+const SUPABASE_URL = "https://zwxfmdhgnlhtkixfkdob.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_JsU8RCkahoM0FS9bQ9clTQ_VpEGmC7u";
 
 let clientPromise = null;
 

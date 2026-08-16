@@ -65,6 +65,7 @@ create or replace function public.generate_invite_code()
 returns text
 language sql
 volatile
+set search_path = public
 as $$
   select (
     (array['warm', 'gentle', 'sunny', 'quiet', 'bright', 'calm', 'soft', 'kind'])[floor(random() * 8 + 1)]
@@ -79,6 +80,7 @@ create or replace function public.handle_invite_insert()
 returns trigger
 language plpgsql
 security invoker
+set search_path = public
 as $$
 begin
   new.owner_id := auth.uid();
@@ -102,6 +104,7 @@ create or replace function public.handle_invite_update()
 returns trigger
 language plpgsql
 security invoker
+set search_path = public
 as $$
 begin
   -- RLS's update policy (owner_id = auth.uid()) already ensures a plain client update can
@@ -153,6 +156,7 @@ create or replace function public.handle_dispatch_insert()
 returns trigger
 language plpgsql
 security invoker
+set search_path = public
 as $$
 begin
   new.owner_id := auth.uid();
@@ -189,6 +193,7 @@ create or replace function public.handle_dispatch_update()
 returns trigger
 language plpgsql
 security invoker
+set search_path = public
 as $$
 declare
   is_owner boolean;
@@ -274,6 +279,7 @@ create or replace function public.handle_comfort_entry_write()
 returns trigger
 language plpgsql
 security invoker
+set search_path = public
 as $$
 begin
   new.owner_id := auth.uid();
