@@ -9,6 +9,21 @@ Built with [GitHub Spec Kit](https://github.com/github/spec-kit). See
 `specs/001-crave-and-care-mvp/` for the full spec, plan, data model, API contract, and task
 breakdown behind this build.
 
+## Deployment
+
+- **Backend**: a live Supabase project ("crave-and-care") is already provisioned and migrated;
+  `public/js/api-client.js` points at it. **One setting needs to be turned on once, by a project
+  owner, before dispatch/comfort/invite syncing works**: in the Supabase dashboard, go to
+  Authentication → Sign In / Providers and enable **Anonymous Sign-Ins**. This can't be done via
+  the API/CLI tooling used to set up everything else here — it's a dashboard-only toggle.
+- **Frontend**: `.github/workflows/deploy-pages.yml` deploys `public/` to GitHub Pages on every
+  push to this branch. **GitHub also requires a one-time manual step** the first time: in this
+  repo's Settings → Pages, set "Source" to **GitHub Actions**. The default workflow token can
+  deploy to an already-enabled Pages site but cannot create one — that's a GitHub platform
+  restriction, not something any workflow permission works around. After that one click, every
+  future push deploys automatically and the site's URL is shown on that same Settings → Pages
+  screen (and in the repo's Actions run summary once a deploy succeeds).
+
 ## Tech stack
 
 Plain HTML, CSS, and vanilla JavaScript (ES modules) — no framework, no bundler, no build step.
