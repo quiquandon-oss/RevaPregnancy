@@ -9,13 +9,15 @@
 Deliver the Crave & Care MVP — instant craving dispatch, comfort tracking, an appointment
 ledger, support-network invites, and onboarding — as a mobile-first Progressive Web App built
 with **plain HTML, CSS, and vanilla JavaScript** (no frontend framework, no build-step
-dependency), per explicit product-owner direction to prioritize simplicity. All core logging
-(craving dispatch creation, energy/comfort entries, appointment/question data) lives entirely in
-the browser (localStorage/IndexedDB) and works fully offline. The one requirement that plain
-client-side storage genuinely cannot satisfy — a support-network member seeing and acting on a
-dispatch from her own separate device — is served by Supabase (hosted Postgres, with its
-auto-generated REST API and Row Level Security doing the authorization work instead of any
-hand-written server code). Everything else stays static files with no custom server to run.
+dependency), per explicit product-owner direction to prioritize simplicity. Appointment and
+question data lives entirely in the browser (localStorage/IndexedDB) and works fully offline.
+Craving dispatches, support-network members, and comfort/energy entries also work fully offline
+via the same local-first pattern, but are additionally synced to Supabase (hosted Postgres, with
+its auto-generated REST API and Row Level Security doing the authorization work instead of any
+hand-written server code) — the first two because a support-network member must see and act on a
+dispatch from her own separate device, the third per product-owner decision so comfort/energy
+history survives device loss and can be reached from a second device once the user optionally
+links an email. Everything else stays static files with no custom server to run.
 
 ## Technical Context
 
@@ -31,11 +33,12 @@ API and anonymous auth. No backend framework (Express/Hono/etc.) at all — Supa
 the REST API from the Postgres schema.
 
 **Storage**: Browser `localStorage` (small profile/settings values) and `IndexedDB` via the
-native API (structured, offline-first local data: comfort entries, appointments, questions, and
-the user's own cached view of dispatches/support-network state) — no ORM/wrapper library.
-Supabase (hosted Postgres) is the server-side source of truth only for the two entities that must
-be visible across two different people's devices: `CravingDispatch` status and
-`SupportNetworkMember` invites/permissions.
+native API (structured, offline-first data: appointments and questions purely locally; a local
+read-cache/offline-write-queue for the three Supabase-synced entities) — no ORM/wrapper library.
+Supabase (hosted Postgres) is the server-side source of truth for `CravingDispatch` status,
+`SupportNetworkMember` invites/permissions (needed across two people's devices), and
+`DailyComfortEntry` (needed across the same person's devices, per product-owner decision — see
+research.md #8).
 
 **Testing**: `node --test` + the built-in `assert` module, run against a local Supabase instance
 (via the Supabase CLI's `supabase start`), for schema/RLS/trigger behavior; a small hand-rolled
@@ -72,14 +75,15 @@ Onboarding x3-4 steps, Partner simplified view).
 |---|---|---|
 | I. Emotional Safety & Non-Judgmental Tone | Plan makes no UI/copy decisions itself; copy guidelines carry forward unchanged into implementation tasks. | PASS |
 | II. Not a Medical Device | Onboarding includes a disclaimer step (FR-024/025); pregnancy-safe notes remain optional/non-blocking (FR-008). No design choice here conflicts. | PASS |
-| III. Privacy & Data Stewardship | Local data stays on-device; the only server-held data (dispatch + support-network records) sits in Supabase Postgres, which encrypts data at rest by default. Partner access is per-invite, permissioned, and enforced by database-level Row Level Security that's revocable immediately (FR-021), satisfying the "immediately revocable" requirement in a way pure client storage could not. | PASS |
+| III. Privacy & Data Stewardship | Appointment/question data stays purely on-device; dispatch, support-network, and comfort records sync to Supabase Postgres, which encrypts data at rest by default. Partner access is per-invite, permissioned, and enforced by database-level Row Level Security that's revocable immediately (FR-021). Comfort data is owner-only in RLS — never shared with a support-network member — and the optional email link (FR-031) only ever grants *the same user* access to *her own* data, never a third party. | PASS |
 | IV. Accessibility by Default | Semantic HTML + hand-written CSS imposes no framework constraint on contrast, touch-target size, reduced-motion, or high-contrast support; these are implementation tasks, not blocked by this plan. | PASS |
-| V. Offline-First, Low-Friction Core | All core logging (dispatch creation, comfort/energy) is local-first via IndexedDB with a sync queue; a service worker caches the app shell. Only the two cross-device entities require connectivity to *sync*, never to *log*. | PASS |
+| V. Offline-First, Low-Friction Core | All core logging (dispatch creation, comfort/energy) is local-first via IndexedDB with a sync queue; a service worker caches the app shell. The three Supabase-synced entities require connectivity only to *sync*, never to *log*. The default identity is still zero-signup (Supabase Anonymous Auth); email-linking (FR-031) is an explicit, optional, later choice, never a barrier to first use. | PASS |
 | VI. Design System Fidelity | Design tokens (colors, spacing, radius, type) are implemented directly as CSS custom properties in `tokens.css` — framework-free by construction. | PASS |
-| VII. Simplicity & No Scope Creep | This plan is the simplicity-maximizing option: zero frontend dependencies, and a backend limited to exactly the two entities that need it (see Complexity Tracking). | PASS, with one documented, justified exception (see below) |
+| VII. Simplicity & No Scope Creep | This plan stays as simple as the requirements allow: zero frontend dependencies beyond one client library, and a backend limited to exactly the entities that need it, each with a documented reason (see Complexity Tracking). | PASS, with two documented, justified exceptions (see below) |
 
-No NON-NEGOTIABLE principle (I, II, III) is violated. One deliberate, justified deviation from
-"pure static HTML with zero servers" is recorded in Complexity Tracking.
+No NON-NEGOTIABLE principle (I, II, III) is violated. Two deliberate, justified deviations from
+"pure static HTML with zero servers" are recorded in Complexity Tracking — both driven by
+explicit product-owner requirements, not by our own preference for complexity.
 
 ## Project Structure
 
@@ -139,8 +143,9 @@ public/                     # Static frontend — served as-is, no build step
 
 supabase/                      # Backend = SQL only (schema + RLS + one trigger + one RPC)
 ├── migrations/
-│   └── 0001_init.sql             # dispatches + support_network_members tables, RLS policies,
-│                                   # status-transition trigger, accept_invite() RPC function
+│   └── 0001_init.sql             # dispatches + support_network_members + comfort_entries
+│                                   # tables, RLS policies, status-transition trigger,
+│                                   # accept_invite() RPC function
 ├── config.toml                    # Supabase CLI local-dev config
 └── tests/
     └── rls-and-transitions.test.js  # node --test against a local Supabase instance
@@ -153,10 +158,10 @@ tests/
 
 **Structure Decision**: Web application split into `public/` (the entire frontend — static
 files only, deployable to any static host/CDN) and `supabase/` (schema + security rules for the
-two synced entities, deployed to a Supabase project — no custom server process of our own to run
-or host). This mirrors the blueprint's "frontend/backend" shape but keeps the backend to the bare
-minimum: no hand-written route handlers, since Supabase generates the REST API directly from the
-schema and Postgres enforces who can do what. `tests/unit/` covers frontend logic;
+three synced entities, deployed to a Supabase project — no custom server process of our own to
+run or host). This mirrors the blueprint's "frontend/backend" shape but keeps the backend to the
+bare minimum: no hand-written route handlers, since Supabase generates the REST API directly from
+the schema and Postgres enforces who can do what. `tests/unit/` covers frontend logic;
 `supabase/tests/` covers the RLS policies and status-transition rules.
 
 ## Complexity Tracking
@@ -166,4 +171,5 @@ schema and Postgres enforces who can do what. `tests/unit/` covers frontend logi
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |---|---|---|
-| Adding a hosted backend (Supabase Postgres) instead of a fully static, backend-less app | Spec FR-005 and FR-019–022 require a support-network member to see and act on (accept / mark on the way / mark delivered) a dispatch from her *own separate device*, and for the inviting user to revoke that access *immediately*. Client-only storage (localStorage/IndexedDB) is scoped to one browser on one device and cannot share or reconcile state across two different people's devices. | A fully static app with no server (e.g. encoding all state into the invite link itself, or relying on manual copy/paste of a status code between the two people) cannot deliver live, two-way status updates — which is the entire value of User Story 1's partner-fulfillment path and is directly measured by SC-002 and SC-007. The backend here is scoped to exactly the two entities that need cross-device visibility (`CravingDispatch`, `SupportNetworkMember`); every other entity (comfort entries, appointments, questions, profile) stays fully client-side. Using Supabase's generated REST API + RLS (rather than hand-writing route handlers on any server, Cloudflare included) keeps this exception as small as SQL-only. |
+| Adding a hosted backend (Supabase Postgres) instead of a fully static, backend-less app | Spec FR-005 and FR-019–022 require a support-network member to see and act on (accept / mark on the way / mark delivered) a dispatch from her *own separate device*, and for the inviting user to revoke that access *immediately*. Client-only storage (localStorage/IndexedDB) is scoped to one browser on one device and cannot share or reconcile state across two different people's devices. | A fully static app with no server (e.g. encoding all state into the invite link itself, or relying on manual copy/paste of a status code between the two people) cannot deliver live, two-way status updates — which is the entire value of User Story 1's partner-fulfillment path and is directly measured by SC-002 and SC-007. The backend here is scoped to exactly the entities that need it (`CravingDispatch`, `SupportNetworkMember`, and — see next row — `DailyComfortEntry`); appointments, questions, and profile fields stay fully client-side. Using Supabase's generated REST API + RLS (rather than hand-writing route handlers on any server, Cloudflare included) keeps this exception as small as SQL-only. |
+| Also syncing `DailyComfortEntry` to Supabase, and offering an optional email-link auth upgrade (FR-031), rather than keeping comfort data purely local forever | Explicit product-owner decision during `/speckit.analyze` remediation: comfort/energy history should survive device loss and be reachable from a second device, not just exist on the one phone it was logged on (FR-013's durability clause). Reaching that from a second device requires *some* way to resume the same identity there — pure anonymous-per-device auth can't do that. | Keeping comfort data local-only (the original, simpler design) was rejected specifically because it doesn't survive a lost/reset device and can't be seen from a second device — the product owner asked for exactly that capability. Requiring email signup for every user up front (rather than making it optional) was rejected as contradicting the zero-friction default (constitution Principle I, V) that governs everyone's first run, including support-network members. |

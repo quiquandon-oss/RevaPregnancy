@@ -1,14 +1,16 @@
 # Backend Contract: Crave & Care Sync (Supabase)
 
-Scope reminder: this contract exists **only** for the two entities that must sync across two
-people's devices (`CravingDispatch`, `SupportNetworkMember`). Everything else in the app
-(comfort entries, appointments, questions, profile) never talks to Supabase — it's local-only.
+Scope reminder: this contract exists **only** for the three entities that sync through Supabase
+(`CravingDispatch`, `SupportNetworkMember`, `DailyComfortEntry`) plus the optional account-linking
+flow (FR-031). Appointments, questions, and the rest of the profile never talk to Supabase — it's
+local-only.
 
 There is no hand-written server here. The frontend talks to Supabase's auto-generated REST API
 through the `supabase-js` client library (loaded as a plain ES module, no build step). Every
 table read/write is authorized by Postgres Row Level Security (RLS) using the caller's Supabase
-Anonymous Auth session (`auth.uid()`) — see `research.md` #4 and `data-model.md`. This document
-describes the *shape* of those calls, not literal HTTP routes to implement by hand.
+Auth session (`auth.uid()`) — anonymous by default, the same identity after an optional email
+link — see `research.md` #4 and #8 and `data-model.md`. This document describes the *shape* of
+those calls, not literal HTTP routes to implement by hand.
 
 ## Session bootstrap (every page load)
 
@@ -126,6 +128,66 @@ await supabase.from('support_network_members').update({ permission_level: 'full_
 A `revoked` status takes effect immediately — every subsequent request from that member's session
 is re-checked against the current row state by RLS, so there's no separate propagation step
 (FR-021).
+
+## Comfort Entries
+
+Owner-only — there is no assignee/sharing concept for this table (comfort data is never visible
+to a support-network member).
+
+### Set/update today's entry (upsert by date)
+
+```js
+const { data, error } = await supabase
+  .from('comfort_entries')
+  .upsert({ date: '2026-08-16', energy_level: 'moderate' }, { onConflict: 'owner_id,date' })
+  .select()
+  .single();
+```
+RLS's insert/update policies restrict this to `owner_id = auth.uid()`, set automatically the same
+way as dispatches — the client never supplies `owner_id` itself.
+
+### Add or update a comfort status within today's entry
+
+```js
+const { data: existing } = await supabase.from('comfort_entries').select('*').eq('date', '2026-08-16').single();
+const statuses = [...(existing?.statuses ?? []), { id: crypto.randomUUID(), label: 'Needs Lower Back Relief', source: 'curated', addressed: false, loggedAt: new Date().toISOString() }];
+await supabase.from('comfort_entries').update({ statuses }).eq('id', existing.id);
+```
+The `statuses` array is stored as a single `jsonb` column (data-model.md) — read-modify-write from
+the client, no separate table/endpoint needed for individual status entries.
+
+### List recent entries (e.g. for a history view, or right after linking an account on a new device)
+
+```js
+const { data } = await supabase.from('comfort_entries').select('*').order('date', { ascending: false }).limit(30);
+```
+
+## Account Linking (optional, FR-031)
+
+Triggered only when the user chooses "back up my account" in Profile — never during onboarding,
+never required.
+
+### Link an email to the current (anonymous) session
+
+```js
+const { data, error } = await supabase.auth.updateUser({ email: 'she@example.com' });
+```
+Supabase sends a confirmation link to that email. The local `User` profile's `linkedEmail`/
+`emailLinkedAt` fields (data-model.md) are set once the confirmation completes (detected via
+`supabase.auth.onAuthStateChange`, since confirming the link updates the current session in
+place — `auth.uid()` does not change).
+
+### Resume the same profile on a second device
+
+```js
+const { error } = await supabase.auth.signInWithOtp({ email: 'she@example.com' });
+// user clicks the emailed link, which completes the sign-in on that device
+```
+This signs the second device into the *same* `auth.uid()` as the original device, so every query
+above (dispatches, support-network members, comfort entries) now returns that same data. The
+local `User` profile fields (name, due date, etc.) are not stored server-side, so the app must
+re-collect or re-derive a local profile shell on first load after this sign-in — the Supabase-held
+data itself is what makes the experience feel "resumed."
 
 ## Error shape
 

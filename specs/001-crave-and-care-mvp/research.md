@@ -19,17 +19,19 @@ and the project constitution.
 
 ## 2. Backend: how to satisfy cross-device partner sync without a heavy stack
 
-- **Decision**: Supabase (hosted Postgres), used only for two tables — `dispatches` and
-  `support_network_members` — accessed through Supabase's auto-generated REST API and Row Level
-  Security (RLS) policies, with no hand-written server route handlers at all. The only "backend
-  code" is SQL: the schema, the RLS policies, one trigger that enforces the dispatch status state
-  machine, and one RPC function (`accept_invite`) for atomically claiming an invite.
+- **Decision**: Supabase (hosted Postgres), used for three tables — `dispatches`,
+  `support_network_members`, and `comfort_entries` — accessed through Supabase's auto-generated
+  REST API and Row Level Security (RLS) policies, with no hand-written server route handlers at
+  all. The only "backend code" is SQL: the schema, the RLS policies, one trigger that enforces the
+  dispatch status state machine, and one RPC function (`accept_invite`) for atomically claiming an
+  invite.
 - **Rationale**: Product owner explicitly asked not to use Cloudflare, and independently confirmed
   Supabase as the preferred option (it was also the blueprint's own §6.1 recommendation). Because
   Supabase generates the REST API directly from the Postgres schema, this backend requires *zero*
   custom application code to write or maintain — arguably simpler than a hand-rolled Cloudflare
-  Worker with route handlers, while still touching only the two entities that need cross-device
-  visibility (FR-005, FR-019–022).
+  Worker with route handlers. It's scoped to exactly the entities that need it: two for
+  cross-person visibility (FR-005, FR-019–022) and one (`comfort_entries`) for the product owner's
+  cross-device-backup requirement (FR-013, FR-031) — see item 8 below.
 - **Alternatives considered**: Cloudflare Workers + D1 — ruled out per explicit product-owner
   direction (no Cloudflare). Firebase/Firestore — rejected for a proprietary SDK and query model
   that's a bigger frontend dependency than a thin REST client, plus less natural fit for the
@@ -66,19 +68,20 @@ and the project constitution.
 - **Alternatives considered**: A hand-rolled device-token header (our original Cloudflare-era
   design) — superseded now that Supabase is the backend, since anonymous auth gives the same
   "no signup" outcome while letting RLS do the authorization instead of custom validation code.
-  Full email/magic-link authentication (blueprint §6.1 suggestion) — rejected for the MVP as
-  unnecessary infrastructure; the app only needs to recognize "this device is this pregnancy
-  profile" and "this device accepted this specific invite," not manage durable multi-device
-  identity or password recovery. Can be layered in later (Supabase supports upgrading an
-  anonymous session to a real account) without changing the data model.
+  Requiring full email/password authentication up front (blueprint §6.1 suggestion) — rejected as
+  unnecessary friction for every user's first run; instead, email linking is offered as a purely
+  optional, later upgrade (FR-031) — see item 8 below — which is exactly the "layer it in later
+  without changing the data model" path this decision anticipated.
 
 ## 5. Client-side storage mechanism
 
 - **Decision**: `IndexedDB` accessed directly via the native browser API for structured,
-  multi-record data (comfort entries, appointments, checklist items, questions, and the local
-  cache of dispatch/support-network state); `localStorage` only for small singleton values
-  (profile fields, feature flags like the pregnancy-safe-notes toggle) — the Supabase anonymous
-  session itself is persisted by `supabase-js`'s own storage, not something we manage by hand.
+  multi-record data — this covers both entities that are purely local (appointments, checklist
+  items, questions) and the local read-cache/offline-write-queue for the three Supabase-synced
+  entities (dispatches, support-network members, comfort entries); `localStorage` only for small
+  singleton values (profile fields, feature flags like the pregnancy-safe-notes toggle) — the
+  Supabase auth session itself is persisted by `supabase-js`'s own storage, not something we
+  manage by hand.
 - **Rationale**: IndexedDB natively supports the queryable, list-shaped data this app needs
   (e.g. "all comfort entries for today," "all unasked questions") without an ORM. Using the
   native API instead of a wrapper (e.g. Dexie, as the blueprint suggested in §6.1) keeps the
@@ -115,3 +118,26 @@ and the project constitution.
 - **Alternatives considered**: Jest/Vitest — rejected as build/dependency overhead not justified
   at this project's size. Playwright/Cypress end-to-end suites — deferred; valuable later but not
   required to validate the MVP's acceptance scenarios, which `quickstart.md` covers manually.
+
+## 8. Letting the primary user resume her profile on a second device (FR-031)
+
+- **Decision**: Comfort/energy entries move from local-only to Supabase-synced (item 2 above), and
+  the primary user's Supabase Auth session can be optionally upgraded from anonymous to
+  email-linked via `supabase.auth.updateUser({ email })`, triggered only when she chooses "back up
+  my account" in Profile. Supabase sends a confirmation link to that email; once confirmed, the
+  same email can be used with `supabase.auth.signInWithOtp({ email })` on any device to sign back
+  into the *same* `auth.uid()` — and therefore the same dispatches, support-network members, and
+  comfort history.
+- **Rationale**: Product owner confirmed she wants comfort/energy data to survive device loss and
+  be reachable from a second device, not just "backed up" invisibly. Since the app's whole
+  low-friction premise depends on zero signup by default (constitution Principle I, V), the fix is
+  to keep anonymous auth as the default and offer email-linking as a deliberate, optional, later
+  step — never shown during onboarding, never required to use any feature (FR-031). This reuses
+  the exact "layer it in later" path research item 4 already anticipated, so it doesn't change the
+  data model — it only adds two nullable fields to the local `User` profile
+  (`linkedEmail`/`emailLinkedAt`) to reflect link status in the UI.
+- **Alternatives considered**: Requiring email up front for every user — rejected as directly
+  contradicting the low-friction, no-signup positioning that's core to the product (and to
+  support-network members' own onboarding, FR-020). A custom password-based account system —
+  rejected as unnecessary; Supabase's passwordless email-link flow gives the same "resume my
+  profile elsewhere" outcome with less to build and nothing for the user to forget.

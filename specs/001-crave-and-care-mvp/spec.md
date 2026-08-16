@@ -172,6 +172,11 @@ user lands on the Home screen.
 3. **Given** onboarding is complete, **When** the user opens Profile later, **Then** she can view
    and edit her name, due date/week, and notification preferences, and reach Support Network
    management from there.
+4. **Given** the user wants to make sure she doesn't lose her data or wants to use the app from a
+   second device, **When** she chooses to back up her account from Profile and adds her email,
+   **Then** she can later open the app on a different device, confirm via a link sent to that
+   email, and see her existing cravings, comfort history, appointments, and support network
+   exactly as she left them — without ever needing to set or remember a password.
 
 ---
 
@@ -233,7 +238,9 @@ user lands on the Home screen.
 - **FR-012**: The system MUST show 1-3 short, non-medical suggestions when a curated comfort
   status is selected, and MUST let the user mark any selected status as "addressed."
 - **FR-013**: The system MUST allow energy and comfort logging to work fully offline, queuing
-  locally and syncing automatically once connectivity returns.
+  locally and syncing automatically once connectivity returns. Once synced, this data MUST be
+  durable beyond the local device (i.e. not lost if the device is lost, reset, or has its
+  browser data cleared).
 
 **Appointment Ledger**
 
@@ -277,6 +284,10 @@ user lands on the Home screen.
   there.
 - **FR-027**: The system MUST keep the medical disclaimer reachable at any later time (e.g. from
   Profile) even though it is not shown as a blocking step again.
+- **FR-031**: The system MUST let the user optionally link an email address to her profile, with
+  no password to set or remember, so she can resume the same profile and data on a different
+  device by confirming a link sent to that email. This MUST remain entirely optional and MUST
+  NOT be required to use any other part of the app.
 
 **Cross-Cutting**
 
@@ -284,15 +295,18 @@ user lands on the Home screen.
   the constitution's non-judgmental tone rules (no "should/must/avoid" phrasing, no clinical or
   alarmist language).
 - **FR-029**: All interactive elements MUST meet the constitution's accessibility requirements
-  (WCAG 2.1 AA contrast, minimum 48px touch targets) and the app MUST offer reduced-motion and
-  high-contrast display modes.
+  (WCAG 2.1 AA contrast, minimum 48px touch targets), the app MUST offer reduced-motion and
+  high-contrast display modes, and MUST support voice input for custom craving entries and
+  free-text questions.
 - **FR-030**: The system MUST NOT sell or share a user's craving, comfort, or appointment data
   with third parties, and MUST encrypt this data at rest.
 
 ### Key Entities *(include if feature involves data)*
 
 - **User**: The pregnant individual using the app. Holds name, due date or current pregnancy
-  week, notification preferences, and her medical-disclaimer acknowledgment status.
+  week, notification preferences, her medical-disclaimer acknowledgment status, and an optional
+  linked email (with a linked/not-linked status) used only to resume her profile on another
+  device.
 - **SupportNetworkMember**: A partner or trusted person invited by a User. Holds a display name,
   the permission level granted, an accepted/pending/revoked status, and a reference to the
   invite used. Does not require a full account/password.
@@ -328,6 +342,9 @@ user lands on the Home screen.
 - **SC-007**: A user can fully revoke a support-network member's access, and that member loses
   visibility into dispatches immediately (verified on the member's own view), with no additional
   steps required.
+- **SC-008**: A user who has linked an email can open the app on a new/second device, confirm via
+  the link sent to that email, and see her existing cravings, comfort history, appointments, and
+  support network — with no password ever set or required.
 
 ## Assumptions
 
@@ -347,6 +364,10 @@ user lands on the Home screen.
   multi-language support are explicitly out of scope for this MVP feature (see product blueprint
   §5.4, §6.1, §11); data structures should not actively block adding them later, but no UI or
   logic for them is required now.
-- Standard web session handling is assumed for the primary User's own authentication (e.g.
-  passwordless/magic-link), since the blueprint recommends low-friction auth (Clerk/Auth.js/
-  Supabase magic link) without mandating a specific provider at the spec level.
+- The primary User's own identity starts as a frictionless, no-signup profile (matching the
+  support-network member experience), and email-linking (FR-031) is a purely optional upgrade she
+  can trigger from Profile whenever she wants cross-device access — never a required step.
+- Craving dispatches and support-network data were already server-backed (for cross-person
+  visibility); comfort/energy data is also server-backed per product-owner decision so that it
+  survives device loss and is reachable once a user links her email, consistent with FR-013's
+  durability requirement.

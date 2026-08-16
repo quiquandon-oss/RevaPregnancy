@@ -1,56 +1,38 @@
 # Phase 1 Data Model: Crave & Care MVP
 
-Entities are grouped by where they live, per the plan's simplicity-first split: most data stays
-entirely on-device; only the two entities that must be visible across two people's devices are
-also mirrored on the server.
+Entities are grouped by where they live. Appointments and questions stay entirely on-device.
+Craving dispatches, support-network members, and comfort/energy entries are all also mirrored on
+the server (Supabase) — see the "Server-synced entities" section below for why each one needs
+that.
 
 ## Client-only entities (IndexedDB / localStorage — never sent to the server)
 
 ### User (localStorage, singleton)
-Represents the pregnant individual using this installation of the app.
+Represents the pregnant individual using this installation of the app. Her profile fields stay
+local; only her Supabase Auth identity (anonymous by default, optionally linked to an email) is
+what ties her to the server-synced entities below — see research.md #4 and #8.
 
 | Field | Type | Notes |
 |---|---|---|
-| `id` | string (uuid) | Generated on first run |
+| `id` | string (uuid) | Generated on first run, local profile record id |
 | `name` | string | Set during onboarding |
 | `dueDate` | date, nullable | Either this or `currentWeek` is set |
 | `currentWeek` | integer 1-42, nullable | Alternative to `dueDate` |
 | `notificationPrefs` | object | `{ dispatchUpdates: bool, comfortReminders: bool }` |
 | `disclaimerAcknowledgedAt` | timestamp, nullable | Set once; gates first use per FR-025 |
 | `pregnancySafeNotesEnabled` | boolean, default `false` | FR-008; off by default |
-| `deviceToken` | string | Locally-generated identity sent to the server API (research.md #4) |
+| `linkedEmail` | string, nullable | Set once she completes the optional email-link flow — FR-031 |
+| `emailLinkedAt` | timestamp, nullable | |
 | `createdAt` | timestamp | |
 
 **Validation**: `name` non-empty. Exactly one of `dueDate`/`currentWeek` must be set. Onboarding
 cannot be considered complete (app should not leave the disclaimer step) until
-`disclaimerAcknowledgedAt` is set.
+`disclaimerAcknowledgedAt` is set. `linkedEmail` is never required for any other field or feature
+to function (FR-031).
 
-### DailyComfortEntry (IndexedDB)
-One day's comfort record. One record per calendar date.
-
-| Field | Type | Notes |
-|---|---|---|
-| `id` | string (uuid) | |
-| `date` | string (YYYY-MM-DD) | Unique per install — FR-010 |
-| `energyLevel` | enum: `low` \| `moderate` \| `full`, nullable | Nullable until first set that day |
-| `statuses` | array of `ComfortStatusEntry` | See below |
-| `updatedAt` | timestamp | |
-
-**ComfortStatusEntry** (embedded, not a separate table):
-
-| Field | Type | Notes |
-|---|---|---|
-| `id` | string (uuid) | |
-| `label` | string | e.g. "Needs Lower Back Relief" |
-| `source` | enum: `curated` \| `custom` | FR-011 |
-| `addressed` | boolean, default `false` | FR-012 |
-| `loggedAt` | timestamp | |
-
-**Validation**: `date` required, one entry per date (upsert on same date). `label` non-empty for
-custom statuses.
-
-**State transitions**: `addressed` toggles `false → true` (and back, so a user can undo). No
-other lifecycle.
+**Note**: the underlying Supabase Auth session (anonymous, or email-linked once FR-031 is used)
+is managed by `supabase-js` itself, persisted in `localStorage` under its own key — it is not a
+field on this local `User` profile record.
 
 ### Appointment (IndexedDB)
 
@@ -95,11 +77,44 @@ read — not a stored relationship.
 
 ## Server-synced entities (Supabase Postgres — source of truth; cached locally for offline reads)
 
-These two entities are the exception carved out in the plan's Complexity Tracking: they need to
-be visible and actionable from two different people's devices, so Supabase is authoritative and
-each device keeps a local read-cache plus an offline write-queue (research.md #5). Every row's
-owner/assignee is identified by a Supabase Anonymous Auth `auth.uid()` (research.md #4), not a
-hand-rolled token — Row Level Security policies enforce who may read or write each row.
+`CravingDispatch` and `SupportNetworkMember` sync because they must be visible and actionable
+from two different people's devices. `DailyComfortEntry` syncs for a different reason — per
+product-owner decision, so a user's comfort/energy history survives losing her device and can be
+reached from a second device once she optionally links an email (FR-031) — but only ever to
+*her own* account; it is never shared with a support-network member. All three keep a local
+read-cache plus an offline write-queue (research.md #5) so logging still works with no
+connection. Every row's owner/assignee is identified by a Supabase Auth `auth.uid()` — anonymous
+by default, the same identity after an optional email link (research.md #4, #8) — not a
+hand-rolled token; Row Level Security policies enforce who may read or write each row.
+
+### DailyComfortEntry (Postgres table `comfort_entries`, cached in IndexedDB)
+One day's comfort record. One record per calendar date per user.
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | uuid, PK | |
+| `owner_id` | uuid, FK → `auth.users.id` | FR-010; owner-only, never shared with support-network members |
+| `date` | date | Unique per `owner_id` — FR-010 |
+| `energy_level` | enum: `low` \| `moderate` \| `full`, nullable | Nullable until first set that day |
+| `statuses` | jsonb array of `ComfortStatusEntry` | See below |
+| `updated_at` | timestamptz | |
+
+**ComfortStatusEntry** (embedded in the `statuses` jsonb column, not a separate table):
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | string (uuid) | |
+| `label` | string | e.g. "Needs Lower Back Relief" |
+| `source` | enum: `curated` \| `custom` | FR-011 |
+| `addressed` | boolean, default `false` | FR-012 |
+| `loggedAt` | timestamp | |
+
+**Validation**: `(owner_id, date)` unique — upsert on conflict. `label` non-empty for custom
+statuses.
+
+**State transitions**: `addressed` toggles `false → true` (and back, so a user can undo). No
+other lifecycle. RLS restricts all access to `owner_id = auth.uid()` — no assignee/sharing
+concept exists for this table.
 
 ### CravingDispatch (Postgres table `dispatches`, cached in IndexedDB)
 
@@ -168,12 +183,13 @@ access — there's no separate "revocation propagation" step to get wrong.
 ## Entity relationship summary
 
 ```
-User (local only, 1 per install; auth.uid() from Supabase Anonymous Auth ties it to the server)
+User (local profile, 1 per install; auth.uid() from Supabase Auth ties it to the server —
+      anonymous by default, or email-linked once FR-031 is used)
   │
-  ├── DailyComfortEntry (local, many, 1 per date)
   ├── Appointment (local, many)
   │      └── ChecklistItem (embedded, many)
   ├── Question (local, many — independent of Appointment)
+  ├── DailyComfortEntry (Supabase, many, 1 per date) — owner_id = User's auth.uid(), owner-only
   ├── SupportNetworkMember (Supabase, many) — owner_id = User's auth.uid()
   └── CravingDispatch (Supabase, many) — owner_id = User's auth.uid()
          └── assigned_member_id → SupportNetworkMember (nullable)

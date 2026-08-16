@@ -63,8 +63,10 @@ Point the frontend's `js/api-client.js` at the local Supabase URL and anon key p
    1-3 suggestions and an "addressed" control (Scenario 3).
 3. Add a custom status with your own label → confirm it saves and can also be marked addressed
    (Scenario 4).
-4. Repeat step 1-2 with the network offline → confirm it still saves locally (Scenario 5,
-   FR-013).
+4. With the browser's network throttled to "offline," repeat step 1 → confirm it still saves
+   locally right away (Scenario 5, FR-013). Then re-enable the network and confirm (via the
+   Supabase Studio local dashboard, or a `select * from comfort_entries` in `supabase db`) that
+   the entry appears in the `comfort_entries` table once connectivity returns.
 
 ## 5. Validate User Story 3 — Appointment Prep (P2)
 
@@ -101,8 +103,24 @@ Point the frontend's `js/api-client.js` at the local Supabase URL and anon key p
 3. From Profile, edit name/due-date/notification preferences and navigate to Support Network from
    there (Scenario 3, FR-026). Confirm the disclaimer text is still reachable from Profile
    (FR-027).
+4. From Profile, choose "back up my account" and enter an email → confirm normal use of the app
+   (dispatch, comfort, appointments) is completely unaffected before you confirm the emailed link
+   (FR-031's "never required" clause). Click the confirmation link (via the local Supabase
+   instance's test inbox, e.g. Inbucket at `http://localhost:54324` when running `supabase
+   start`) → confirm Profile now shows the account as linked.
 
-## 8. Spot-check cross-cutting requirements
+## 8. Validate account linking across devices (FR-031, SC-008)
+
+1. With an account already linked (previous section), open the app in a second browser profile
+   (a fresh, unlinked "device").
+2. Choose "I've used Crave & Care before" (or equivalent) on the welcome step, enter the same
+   email, and confirm via the emailed link on that second device.
+3. Confirm the second device now shows the same craving dispatches, comfort/energy history, and
+   support-network members as the first device (SC-008). Note: locally-only profile fields (name,
+   due date) are not carried over automatically — confirm the app prompts to re-enter them rather
+   than showing stale/blank data as if it were an error.
+
+## 9. Spot-check cross-cutting requirements
 
 - **Tone (FR-028)**: skim every screen's copy for "should/must/avoid" phrasing or clinical tone —
   none should appear.
