@@ -1,8 +1,8 @@
 {
-  "name": "Crave & Care",
-  "short_name": "Crave & Care",
-  "description": "A calm, supportive companion for pregnancy cravings and comfort.",
-  "start_url": "index.html",
+  "name": "Crave & Care — For You",
+  "short_name": "For You",
+  "description": "See and fulfill the craving requests sent to you.",
+  "start_url": "partner.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
