@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Comfort — Crave & Care</title>
+    <meta name="theme-color" content="#8fae8b" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="css/tokens.css" />
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/components.css" />
+  </head>
+  <body>
+    <main class="app-main stack">
+      <h1>Today's Energy Level</h1>
+      <div class="card">
+        <div class="segmented" role="group" aria-label="Energy level" id="energy-group">
+          <button type="button" class="segmented__option" data-value="low" aria-pressed="false">Low</button>
+          <button type="button" class="segmented__option" data-value="moderate" aria-pressed="false">Moderate</button>
+          <button type="button" class="segmented__option" data-value="full" aria-pressed="false">Full</button>
+        </div>
+      </div>
+
+      <h2>Physical Comfort Status</h2>
+      <div class="stack" id="status-list"></div>
+
+      <div class="field">
+        <label for="custom-status">Something else?</label>
+        <div class="row">
+          <input type="text" id="custom-status" placeholder="Describe how you're feeling" />
+          <button class="btn btn-outline" id="add-custom-status">Add</button>
+        </div>
+      </div>
+    </main>
+
+    <script type="module" src="js/views/comfort.js"></script>
+  </body>
+</html>

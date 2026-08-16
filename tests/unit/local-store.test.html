@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Local store unit tests</title>
+    <style>
+      body { font-family: monospace; padding: 24px; }
+      .pass { color: #2c7a2c; }
+      .fail { color: #b3564f; font-weight: bold; }
+    </style>
+  </head>
+  <body>
+    <h1>Local store unit tests</h1>
+    <div id="results"></div>
+
+    <script type="module">
+      import { get, getAll, put, remove, clearAll } from "../../public/js/db/local-store.js";
+
+      const results = [];
+      async function check(name, fn) {
+        try {
+          await fn();
+          results.push({ name, pass: true });
+        } catch (error) {
+          results.push({ name, pass: false, error: error.message });
+        }
+      }
+      function assertEqual(actual, expected, msg) {
+        if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+          throw new Error(`${msg || "assertion failed"}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
+        }
+      }
+
+      await clearAll("comfortEntries");
+      await clearAll("appointments");
+      await clearAll("questions");
+
+      await check("put + get round-trips a comfort entry by date", async () => {
+        await put("comfortEntries", { date: "2026-08-16", energyLevel: "moderate", statuses: [] });
+        const stored = await get("comfortEntries", "2026-08-16");
+        assertEqual(stored.energyLevel, "moderate");
+      });
+
+      await check("put with the same date upserts rather than duplicating (one entry per date)", async () => {
+        await put("comfortEntries", { date: "2026-08-16", energyLevel: "low", statuses: [] });
+        const all = await getAll("comfortEntries");
+        const matches = all.filter((e) => e.date === "2026-08-16");
+        assertEqual(matches.length, 1);
+        assertEqual(matches[0].energyLevel, "low");
+      });
+
+      await check("getAll returns every stored entry across different dates", async () => {
+        await put("comfortEntries", { date: "2026-08-15", energyLevel: "full", statuses: [] });
+        const all = await getAll("comfortEntries");
+        assertEqual(all.length, 2);
+      });
+
+      await check("appointments store supports independent CRUD", async () => {
+        await put("appointments", { id: "a1", title: "OB-GYN checkup", datetime: "2026-09-01T10:00:00Z", checklist: [] });
+        const stored = await get("appointments", "a1");
+        assertEqual(stored.title, "OB-GYN checkup");
+        await remove("appointments", "a1");
+        const afterRemove = await get("appointments", "a1");
+        assertEqual(afterRemove, null);
+      });
+
+      await check("questions store persists independent of appointments", async () => {
+        await put("questions", { id: "q1", text: "Is this normal?", asked: false });
+        const all = await getAll("questions");
+        assertEqual(all.length, 1);
+        assertEqual(all[0].asked, false);
+      });
+
+      const container = document.getElementById("results");
+      let failed = 0;
+      for (const r of results) {
+        const div = document.createElement("div");
+        div.className = r.pass ? "pass" : "fail";
+        div.textContent = `${r.pass ? "PASS" : "FAIL"} — ${r.name}${r.error ? ": " + r.error : ""}`;
+        container.appendChild(div);
+        if (!r.pass) failed++;
+      }
+      const summary = document.createElement("p");
+      summary.textContent = `${results.length - failed}/${results.length} passed`;
+      container.prepend(summary);
+      window.__TEST_RESULTS__ = { total: results.length, failed };
+    </script>
+  </body>
+</html>

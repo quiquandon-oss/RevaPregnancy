@@ -163,24 +163,24 @@ entry appears in Supabase once back online.
 
 - [X] T030 [P] [US2] Create `public/js/models/comfort-entry.js`: factory + validation for
       `DailyComfortEntry` and embedded `ComfortStatusEntry` per data-model.md
-- [ ] T031 [US2] Add `DailyComfortEntry` handling (upsert-by-date local cache + offline queue) to
+- [X] T031 [US2] Add `DailyComfortEntry` handling (upsert-by-date local cache + offline queue) to
       `local-store.js` / `sync-queue.js`, following the same pattern as dispatch handling in
       Phase 3 (depends on T012, T013, T030)
-- [ ] T032 [US2] Implement comfort-entry create/upsert/list calls in `public/js/api-client.js`
+- [X] T032 [US2] Implement comfort-entry create/upsert/list calls in `public/js/api-client.js`
       per contracts/api.md, falling back to the offline queue when the network is unavailable
       (depends on T014, T031)
-- [ ] T033 [P] [US2] Create `public/js/data/comfort-statuses.js`: the curated list of comfort
+- [X] T033 [P] [US2] Create `public/js/data/comfort-statuses.js`: the curated list of comfort
       statuses (label + 1-3 gentle, non-medical suggestions each) from spec.md's examples
-- [ ] T034 [US2] Build `public/comfort.html` (Comfort Dashboard): energy-level control (Low /
+- [X] T034 [US2] Build `public/comfort.html` (Comfort Dashboard): energy-level control (Low /
       Moderate / Full), expandable comfort-status list, custom-status entry, per blueprint
       screen C-01
-- [ ] T035 [US2] Implement `public/js/views/comfort.js`: set/change today's energy level,
+- [X] T035 [US2] Implement `public/js/views/comfort.js`: set/change today's energy level,
       select/expand a status to show its suggestions, add a custom status, toggle "addressed" —
       saved locally first, then synced via `api-client.js` (depends on T032, T033, T034)
-- [ ] T036 [P] [US2] Extend `supabase/tests/rls-and-transitions.test.js` with `comfort_entries`
+- [X] T036 [P] [US2] Extend `supabase/tests/rls-and-transitions.test.js` with `comfort_entries`
       RLS cases: an owner can read/write only her own entries, and no other caller (including an
       accepted support-network member) can read them (depends on T009, T028)
-- [ ] T037 [P] [US2] Write `tests/unit/local-store.test.html`: assertions for
+- [X] T037 [P] [US2] Write `tests/unit/local-store.test.html`: assertions for
       `DailyComfortEntry` CRUD, including the "one entry per (owner, date)" upsert rule (depends
       on T031)
 

@@ -1,6 +1,6 @@
 // Shared boot logic loaded by every page: bottom nav, accessibility preferences, Supabase
 // session init, disclaimer gate, and the magic-link confirmation handler.
-import { ensureSession, onAuthStateChange, supabase } from "./api-client.js";
+import { ensureSession, onAuthStateChange } from "./api-client.js";
 import { getProfile } from "./db/profile-store.js";
 
 const NAV_ITEMS = [
@@ -97,5 +97,3 @@ export async function bootPage({ skipDisclaimerGate = false } = {}) {
   await ensureSession();
   if (!skipDisclaimerGate) await enforceDisclaimerGate();
 }
-
-export { supabase };
