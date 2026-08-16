@@ -42,11 +42,18 @@ async function refresh() {
 
 function wireCreateInvite() {
   document.getElementById("create-invite").addEventListener("click", async () => {
-    const member = await createInvite("dispatch_recipient");
-    const link = inviteLink(member.inviteCode);
-    document.getElementById("invite-link").value = link;
-    document.getElementById("new-invite-card").hidden = false;
-    await refresh();
+    const errorEl = document.getElementById("invite-error");
+    errorEl.hidden = true;
+    try {
+      const member = await createInvite("dispatch_recipient");
+      const link = inviteLink(member.inviteCode);
+      document.getElementById("invite-link").value = link;
+      document.getElementById("new-invite-card").hidden = false;
+      await refresh();
+    } catch (error) {
+      errorEl.textContent = "That didn't go through — check your connection and try again in a moment.";
+      errorEl.hidden = false;
+    }
   });
 }
 
