@@ -38,8 +38,8 @@ export async function listAcceptedSupportMembers() {
   return all.filter((m) => m.status === "accepted");
 }
 
-export async function createInvite(permissionLevel = "dispatch_recipient") {
-  const { data, error } = await api.createInvite({ permissionLevel });
+export async function createInvite(permissionLevel = "dispatch_recipient", label = null) {
+  const { data, error } = await api.createInvite({ permissionLevel, displayName: label });
   if (error) throw error;
   const record = fromApiRow(data);
   await put(STORE, record);

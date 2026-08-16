@@ -42,14 +42,17 @@ function wireInviteStep() {
   document.getElementById("invite-now").addEventListener("click", async () => {
     const errorEl = document.getElementById("onboarding-invite-error");
     errorEl.hidden = true;
+    const labelInput = document.getElementById("onboarding-invite-label");
+    const label = labelInput.value.trim() || null;
     try {
-      const member = await createInvite("dispatch_recipient");
+      const member = await createInvite("dispatch_recipient", label);
       const link = inviteLink(member.inviteCode);
       document.getElementById("onboarding-invite-link").value = link;
       const message = `Here's my Crave & Care invite — no account needed, just tap the link: ${link}`;
       document.getElementById("onboarding-whatsapp-invite-link").href = `https://wa.me/?text=${encodeURIComponent(message)}`;
       document.getElementById("onboarding-invite-card").hidden = false;
       document.getElementById("onboarding-invite-skip").textContent = "Continue";
+      labelInput.value = "";
     } catch (error) {
       errorEl.textContent = "That didn't go through — check your connection and try again in a moment.";
       errorEl.hidden = false;

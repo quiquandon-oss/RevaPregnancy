@@ -120,9 +120,13 @@ export async function updateDispatchStatus(dispatchId, status) {
 // Support network
 // ---------------------------------------------------------------------------
 
-export async function createInvite({ permissionLevel = "dispatch_recipient" } = {}) {
+export async function createInvite({ permissionLevel = "dispatch_recipient", displayName = null } = {}) {
   return withClient((client) =>
-    client.from("support_network_members").insert({ permission_level: permissionLevel }).select().single()
+    client
+      .from("support_network_members")
+      .insert({ permission_level: permissionLevel, display_name: displayName })
+      .select()
+      .single()
   );
 }
 
