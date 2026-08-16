@@ -1,140 +1,136 @@
-# API Contract: Crave & Care Sync Backend
+# Backend Contract: Crave & Care Sync (Supabase)
 
-Scope reminder: this API exists **only** for the two entities that must sync across two
+Scope reminder: this contract exists **only** for the two entities that must sync across two
 people's devices (`CravingDispatch`, `SupportNetworkMember`). Everything else in the app
-(comfort entries, appointments, questions, profile) never touches this API — it's local-only.
+(comfort entries, appointments, questions, profile) never talks to Supabase — it's local-only.
 
-All requests are plain JSON over HTTPS to the Cloudflare Worker. There is no session/cookie
-auth; every request identifies its caller with a device token header (see research.md #4):
+There is no hand-written server here. The frontend talks to Supabase's auto-generated REST API
+through the `supabase-js` client library (loaded as a plain ES module, no build step). Every
+table read/write is authorized by Postgres Row Level Security (RLS) using the caller's Supabase
+Anonymous Auth session (`auth.uid()`) — see `research.md` #4 and `data-model.md`. This document
+describes the *shape* of those calls, not literal HTTP routes to implement by hand.
 
+## Session bootstrap (every page load)
+
+```js
+const { data: { session } } = await supabase.auth.getSession();
+if (!session) {
+  await supabase.auth.signInAnonymously();
+}
 ```
-X-Device-Token: <opaque string, generated client-side on first use or on invite acceptance>
-```
-
-The server never trusts a device token to *be* a particular permission — it looks up what that
-token is allowed to see/do on every request (e.g. "is this the owner?" / "is this an accepted,
-non-revoked assigned member?").
+`supabase-js` persists the resulting session in `localStorage` automatically — there's no token
+or header we manage ourselves. From here, every call below is automatically scoped to this
+session's `auth.uid()` by RLS; the frontend never needs to pass "who am I" explicitly.
 
 ## Dispatches
 
-### `POST /api/dispatches`
-Create a craving dispatch. Caller must be the owning user's device token.
+### Create a dispatch
+Caller must be the owning user's session.
 
-Request body:
-```json
-{
-  "category": "salty",
-  "itemName": "pickled mango",
-  "intensity": 4,
-  "fulfiller": "support_member",
-  "assignedMemberId": "sm_123"
-}
+```js
+const { data, error } = await supabase
+  .from('dispatches')
+  .insert({
+    category: 'salty',
+    item_name: 'pickled mango',
+    intensity: 4,
+    fulfiller: 'support_member',
+    assigned_member_id: 'sm-uuid',
+  })
+  .select()
+  .single();
 ```
-`assignedMemberId` omitted/null when `fulfiller` is `"self"`.
+RLS's insert policy sets `owner_id = auth.uid()` automatically (via a default/trigger, not a
+client-supplied field — the client cannot claim a dispatch on someone else's behalf) and rejects
+the insert if `assigned_member_id` isn't an `accepted` member owned by the caller. When
+`fulfiller = 'self'`, the insert policy/trigger creates the row directly with `status =
+'delivered'` (see data-model.md).
 
-Response `201`:
-```json
-{
-  "id": "cd_456",
-  "status": "requested",
-  "requestedAt": "2026-08-16T14:02:00Z"
-}
+### List dispatches relevant to the caller
+
+```js
+// As the owner:
+const { data } = await supabase.from('dispatches').select('*').eq('owner_id', myUid);
+
+// As an assigned support-network member (their own view, partner.html):
+const { data } = await supabase.from('dispatches').select('*').eq('assigned_member_id', myMemberRowId);
 ```
-When `fulfiller` is `"self"`, the response's `status` is `"delivered"` immediately (see
-data-model.md).
+RLS ensures a caller only ever gets rows they're actually allowed to see, regardless of the
+filter used — these `.eq()` calls are for efficiency, not security.
 
-Errors: `400` invalid category/intensity; `403` `assignedMemberId` does not belong to this owner
-or is not in `accepted` status.
+### Advance or cancel a dispatch's status
 
-### `GET /api/dispatches?role=owner|assignee`
-List dispatches relevant to the caller. `role=owner` (default) returns dispatches the caller's
-device token created. `role=assignee` returns dispatches assigned to the caller as a
-support-network member — this is what the partner view (`partner.html`) polls.
-
-Response `200`: array of dispatch objects (full shape as in data-model.md, camelCase).
-
-### `GET /api/dispatches/:id`
-Fetch one dispatch. Caller must be its owner or assigned member.
-
-### `PATCH /api/dispatches/:id/status`
-Advance or cancel a dispatch's status.
-
-Request body:
-```json
-{ "status": "on_the_way" }
+```js
+const { data, error } = await supabase
+  .from('dispatches')
+  .update({ status: 'on_the_way' })
+  .eq('id', dispatchId)
+  .select()
+  .single();
 ```
-
-Authorization: the owner may set `status: "cancelled"` only from `requested`/`accepted`. The
-assigned member may set `status` forward one step at a time along
-`accepted → on_the_way → delivered` (and `accepted` itself, from `requested`). Any other
-transition, or a caller who is neither owner nor assignee, gets `403`.
-
-Response `200`: the updated dispatch object.
+A `BEFORE UPDATE` trigger rejects any transition outside the allowed state machine
+(`data-model.md`) regardless of caller. RLS's update policy separately rejects the call entirely
+(`error.code` reflecting a permissions failure) unless the caller is the dispatch's owner
+(only allowed to move to `cancelled`) or its assigned member (only allowed to move forward one
+step along `accepted → on_the_way → delivered`).
 
 ## Support Network
 
-### `POST /api/support-network/invites`
-Create an invite. Caller becomes the invite's owner.
+### Create an invite
+Caller becomes the invite's owner.
 
-Request body:
-```json
-{ "permissionLevel": "dispatch_recipient" }
+```js
+const { data } = await supabase
+  .from('support_network_members')
+  .insert({ permission_level: 'dispatch_recipient' })
+  .select()
+  .single();
+// data.invite_code, e.g. "warm-otter-42"
 ```
+The frontend turns `invite_code` into a shareable link (e.g.
+`/partner.html?invite=warm-otter-42`) — a client-only concern. Actual delivery (SMS/email) is
+simulated per FR-023 and out of scope here.
 
-Response `201`:
-```json
-{ "id": "sm_123", "inviteCode": "warm-otter-42", "status": "pending" }
+### Accept an invite
+No prior session state assumed beyond having just called `signInAnonymously()` — this is how a
+support-network member's device gets its own identity in the first place.
+
+```js
+const { data, error } = await supabase.rpc('accept_invite', {
+  invite_code: 'warm-otter-42',
+  display_name: 'Sam',
+});
+// data: { id, status: 'accepted' }
 ```
-The frontend turns `inviteCode` into a shareable link (e.g. `/partner.html?invite=warm-otter-42`)
-via a client-only concern — the delivery channel itself (SMS/email) is simulated per FR-023 and
-out of scope for this API.
+`accept_invite` is a `SECURITY DEFINER` Postgres function so it can look up the invite by code
+(which the caller's own RLS wouldn't otherwise permit before they're linked to it) and stamps
+`member_auth_id = auth.uid()` for the *calling* session — it cannot be used to claim an invite on
+someone else's behalf. Returns an error (surfaced via `error.message`) for an unknown/expired
+code or one already `revoked`.
 
-### `POST /api/support-network/invites/:inviteCode/accept`
-Accept an invite. No prior authentication — this is how a support-network member gets a device
-token in the first place.
+### List the caller's own support-network members
 
-Request body:
-```json
-{ "displayName": "Sam" }
+```js
+const { data } = await supabase.from('support_network_members').select('*').eq('owner_id', myUid);
 ```
-`displayName` optional per FR-020.
+Includes `pending` invites not yet accepted.
 
-Response `200`:
-```json
-{ "id": "sm_123", "status": "accepted", "memberDeviceToken": "..." }
+### Revoke access or change permission level
+Owner-only; enforced by RLS's update policy (`owner_id = auth.uid()`).
+
+```js
+await supabase.from('support_network_members').update({ status: 'revoked' }).eq('id', memberId);
+// or:
+await supabase.from('support_network_members').update({ permission_level: 'full_support_access' }).eq('id', memberId);
 ```
-The frontend stores `memberDeviceToken` locally and uses it as this device's `X-Device-Token`
-from then on.
+A `revoked` status takes effect immediately — every subsequent request from that member's session
+is re-checked against the current row state by RLS, so there's no separate propagation step
+(FR-021).
 
-Errors: `404` unknown/expired code; `409` invite already `revoked`.
+## Error shape
 
-### `GET /api/support-network`
-List the caller's own support-network members (caller must be the owning user).
-
-Response `200`: array of `SupportNetworkMember` objects (camelCase, per data-model.md), including
-`pending` invites not yet accepted.
-
-### `PATCH /api/support-network/:id`
-Owner-only. Revoke access or change permission level.
-
-Request body:
-```json
-{ "status": "revoked" }
-```
-or
-```json
-{ "permissionLevel": "full_support_access" }
-```
-
-Response `200`: updated member object. A `revoked` status takes effect immediately — any
-subsequent request bearing that member's device token gets `403` on every dispatch/support-network
-route (FR-021).
-
-## Error shape (all endpoints)
-
-```json
-{ "error": { "code": "forbidden", "message": "human-readable, non-technical explanation" } }
-```
-Per constitution Principle I, `message` text follows the same non-judgmental tone rules as the
-rest of the app even though this is a machine-facing API — errors surfaced to the user in the UI
-are drawn from (or rephrased gently from) this field.
+`supabase-js` calls return `{ data, error }`. On failure, `error.message` is a Postgres/PostgREST
+message — the frontend rephrases it into the app's non-judgmental tone (per constitution
+Principle I) rather than surfacing raw database errors to the user; it never blocks on a
+technical error type the UI doesn't recognize (falls back to a generic, gentle "that didn't quite
+go through — want to try again?" message).

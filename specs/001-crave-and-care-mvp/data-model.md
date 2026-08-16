@@ -93,31 +93,34 @@ Not tied to a single appointment — persists independently (FR-017).
 `ChecklistItem`s with `completed = false` plus all `Question`s with `asked = false`, computed on
 read — not a stored relationship.
 
-## Server-synced entities (Cloudflare D1 — source of truth; cached locally for offline reads)
+## Server-synced entities (Supabase Postgres — source of truth; cached locally for offline reads)
 
 These two entities are the exception carved out in the plan's Complexity Tracking: they need to
-be visible and actionable from two different people's devices, so the server is authoritative and
-each device keeps a local read-cache plus an offline write-queue (research.md #5).
+be visible and actionable from two different people's devices, so Supabase is authoritative and
+each device keeps a local read-cache plus an offline write-queue (research.md #5). Every row's
+owner/assignee is identified by a Supabase Anonymous Auth `auth.uid()` (research.md #4), not a
+hand-rolled token — Row Level Security policies enforce who may read or write each row.
 
-### CravingDispatch (D1 table `dispatches`, cached in IndexedDB)
+### CravingDispatch (Postgres table `dispatches`, cached in IndexedDB)
 
 | Field | Type | Notes |
 |---|---|---|
-| `id` | string (uuid), PK | |
-| `owner_device_token` | string | The requesting user's device token — FR-001 |
-| `category` | string | Salty / Sweet / Sour / Cold Drink / Fresh Fruit / Specific Snack |
-| `item_name` | string, nullable | Free-text note |
-| `intensity` | integer 1-5 | |
+| `id` | uuid, PK | |
+| `owner_id` | uuid, FK → `auth.users.id` | The requesting user's anonymous-auth identity — FR-001 |
+| `category` | text | Salty / Sweet / Sour / Cold Drink / Fresh Fruit / Specific Snack |
+| `item_name` | text, nullable | Free-text note |
+| `intensity` | smallint, 1-5 | |
 | `fulfiller` | enum: `self` \| `support_member` | FR-002 |
-| `assigned_member_id` | string, nullable, FK → `support_network_members.id` | Set only when `fulfiller = support_member` |
+| `assigned_member_id` | uuid, nullable, FK → `support_network_members.id` | Set only when `fulfiller = support_member` |
 | `status` | enum: `requested` \| `accepted` \| `on_the_way` \| `delivered` \| `cancelled` | FR-003 |
-| `requested_at` | timestamp | |
-| `status_updated_at` | timestamp | |
+| `requested_at` | timestamptz | |
+| `status_updated_at` | timestamptz | |
 
 **Validation**: If `fulfiller = support_member`, `assigned_member_id` is required and must
-reference an `accepted` `SupportNetworkMember` belonging to the same owner. If `fulfiller =
-self`, the dispatch is created directly in `delivered` status (no one else needs to act; it's
-just a log entry) — see Edge Cases in spec.md for the "self" path.
+reference an `accepted` `SupportNetworkMember` belonging to the same owner (enforced by a check in
+the insert RLS policy). If `fulfiller = self`, the dispatch is created directly in `delivered`
+status (no one else needs to act; it's just a log entry) — see Edge Cases in spec.md for the
+"self" path.
 
 **State transitions** (FR-003, FR-004):
 
@@ -126,46 +129,52 @@ requested → accepted → on_the_way → delivered
 requested → cancelled
 accepted  → cancelled
 ```
-No transition is valid out of `delivered` or `cancelled` (terminal states). Only the dispatch's
-`owner_device_token` may cancel; only the `assigned_member_id`'s device token may advance
-`accepted`/`on_the_way`/`delivered`.
+No transition is valid out of `delivered` or `cancelled` (terminal states). Enforced by a
+`BEFORE UPDATE` Postgres trigger that rejects any other transition. Row Level Security separately
+restricts *who* may attempt an update: only `owner_id = auth.uid()` may set `cancelled`; only the
+row's `assigned_member_id`'s linked auth identity (via `support_network_members.member_auth_id`)
+may advance `accepted`/`on_the_way`/`delivered`.
 
-### SupportNetworkMember (D1 table `support_network_members`, cached in IndexedDB)
+### SupportNetworkMember (Postgres table `support_network_members`, cached in IndexedDB)
 
 | Field | Type | Notes |
 |---|---|---|
-| `id` | string (uuid), PK | |
-| `owner_device_token` | string | The inviting user |
-| `display_name` | string, nullable | Set by the invitee on accept — FR-020 |
+| `id` | uuid, PK | |
+| `owner_id` | uuid, FK → `auth.users.id` | The inviting user |
+| `display_name` | text, nullable | Set by the invitee on accept — FR-020 |
 | `permission_level` | enum: `dispatch_recipient` \| `full_support_access` | FR-019; MVP UI only exposes `dispatch_recipient`, schema allows room to grow |
-| `invite_code` | string, unique | Shareable link/code — FR-019 |
-| `member_device_token` | string, nullable | Set once the invite is accepted; identifies the invitee's device |
+| `invite_code` | text, unique | Shareable link/code — FR-019 |
+| `member_auth_id` | uuid, nullable, FK → `auth.users.id` | Set once the invite is accepted; the invitee's anonymous-auth identity |
 | `status` | enum: `pending` \| `accepted` \| `revoked` | |
-| `invited_at` / `accepted_at` / `revoked_at` | timestamp, nullable | |
+| `invited_at` / `accepted_at` / `revoked_at` | timestamptz, nullable | |
 
 **Validation**: `invite_code` unique and unguessable (random, sufficient entropy). A `pending`
-invite has no `member_device_token` yet.
+invite has no `member_auth_id` yet. Claiming an invite happens through the `accept_invite(code,
+display_name)` RPC function (SECURITY DEFINER), not a raw table update, so the claim is atomic
+and stamps the *caller's own* `auth.uid()` — a client can't claim an invite on someone else's
+behalf.
 
 **State transitions** (FR-020, FR-021):
 
 ```
-pending → accepted   (invitee opens the link/code)
+pending → accepted   (invitee opens the link/code and calls accept_invite())
 pending → revoked    (inviter revokes before anyone accepted)
 accepted → revoked   (inviter revokes active access — takes effect immediately, FR-021)
 ```
-`revoked` is terminal; a revoked member's `member_device_token` immediately loses API access to
-that owner's dispatches (enforced server-side on every request, not just hidden client-side).
+`revoked` is terminal; because every dispatch/support-network read and write is RLS-checked
+against the *current* row state on every request, a revoked member's session immediately loses
+access — there's no separate "revocation propagation" step to get wrong.
 
 ## Entity relationship summary
 
 ```
-User (local only, 1 per install)
-  │  owns (by device token, not a DB foreign key)
+User (local only, 1 per install; auth.uid() from Supabase Anonymous Auth ties it to the server)
+  │
   ├── DailyComfortEntry (local, many, 1 per date)
   ├── Appointment (local, many)
   │      └── ChecklistItem (embedded, many)
   ├── Question (local, many — independent of Appointment)
-  ├── SupportNetworkMember (server, many)
-  └── CravingDispatch (server, many)
+  ├── SupportNetworkMember (Supabase, many) — owner_id = User's auth.uid()
+  └── CravingDispatch (Supabase, many) — owner_id = User's auth.uid()
          └── assigned_member_id → SupportNetworkMember (nullable)
 ```

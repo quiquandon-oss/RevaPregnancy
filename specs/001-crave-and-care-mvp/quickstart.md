@@ -2,13 +2,15 @@
 
 This is a manual, human-run validation guide — it proves the feature works end-to-end against
 the acceptance scenarios in `spec.md`. It is not a substitute for the automated unit tests under
-`tests/unit/` and `server/tests/`.
+`tests/unit/` and `supabase/tests/`.
 
 ## Prerequisites
 
 - A modern browser (Chrome, Safari, Firefox, or Edge) — no install needed for the frontend.
-- Node.js 20+ and the Cloudflare `wrangler` CLI, only if validating the sync backend locally.
-- No account, API key, or paid service is required to run everything locally.
+- Node.js 20+, the Supabase CLI, and Docker (which the Supabase CLI uses to run Postgres
+  locally) — only if validating the sync backend locally.
+- No paid service is required to run everything locally; a free Supabase account is only needed
+  once you're ready to deploy, not for local validation.
 
 ## 1. Run the frontend (static files, no build step)
 
@@ -24,15 +26,15 @@ Open the printed local URL in a browser. Because there's no build step, editing 
 
 ## 2. Run the sync backend locally
 
-From `server/`:
+From the repository root:
 
 ```bash
-wrangler d1 execute crave-and-care --local --file=./src/db/schema.sql
-wrangler dev
+supabase start        # boots local Postgres + auth + the generated REST API
+supabase db reset      # applies supabase/migrations/0001_init.sql
 ```
 
-Point the frontend's `js/api-client.js` base URL at the printed local Worker URL (a single
-constant to edit — no environment-variable tooling needed for local dev).
+Point the frontend's `js/api-client.js` at the local Supabase URL and anon key printed by
+`supabase start` (two constants to edit — no environment-variable tooling needed for local dev).
 
 ## 3. Validate User Story 1 — Instant Craving Dispatch (P1)
 
