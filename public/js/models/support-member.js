@@ -13,8 +13,14 @@ export function validateInviteInput({ permissionLevel }) {
   return errors;
 }
 
+// GitHub Pages project sites (not user/org root sites) serve from a subpath —
+// https://quiquandon-oss.github.io/RevaPregnancy/ — but window.location.origin is just the
+// host (https://quiquandon-oss.github.io), so using it alone drops the "/RevaPregnancy" segment
+// and produces a link that 404s. Deriving the base from the current page's own directory keeps
+// this correct wherever the app is actually deployed, without hardcoding the repo name.
 export function inviteLink(inviteCode, origin = window.location.origin) {
-  return `${origin}/partner.html?invite=${encodeURIComponent(inviteCode)}`;
+  const basePath = window.location.pathname.replace(/[^/]*$/, "");
+  return `${origin}${basePath}partner.html?invite=${encodeURIComponent(inviteCode)}`;
 }
 
 export function isActiveMember(member) {
