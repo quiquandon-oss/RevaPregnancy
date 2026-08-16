@@ -316,7 +316,7 @@ across two devices).
       Phase 3-7's HTML/CSS/JS files existing)
 - [X] T063 [P] Update the root `README.md` with setup/run instructions, a design-token summary,
       and a component inventory, per the product blueprint's §12 deliverables
-- [ ] T064 Run the full `quickstart.md` validation guide end-to-end (all five user stories, the
+- [X] T064 Run the full `quickstart.md` validation guide end-to-end (all five user stories, the
       cross-device account-linking check in its §8, and the cross-cutting checks in its §9) and
       record/fix any gaps found
 

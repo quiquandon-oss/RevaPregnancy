@@ -131,3 +131,30 @@ Point the frontend's `js/api-client.js` at the local Supabase URL and anon key p
   still succeed and be visibly saved.
 - **Timing (SC-001)**: time yourself performing step 3.1-3.2 from a cold app open — should be well
   under 8 seconds of active interaction.
+
+## Validation record (implementation pass)
+
+What was actually run against this build, and how, during `/speckit.implement`:
+
+- **Backend logic (RLS, status trigger, `accept_invite` RPC)**: exercised against a real
+  Postgres instance (not a mock), with a hand-built `auth` schema replicating Supabase's exact
+  `auth.uid()` contract and `authenticated`/`anon` roles. Covers: owner/assignee dispatch
+  isolation, the full status state machine (including rejecting invalid transitions and
+  terminal states), `accept_invite` atomicity, immediate access loss on revoke, and
+  `comfort_entries` owner-only isolation. This caught and fixed a real bug (revoked members
+  retaining dispatch access) before it reached any real user.
+- **Frontend**: every page exercised end-to-end in real headless Chromium — onboarding through
+  to Home, comfort logging, appointment + checklist + question flow, support-network invite
+  creation, and the full offline-queue/service-worker caching behavior with network access cut
+  entirely. This caught and fixed four real bugs: an offline-first regression where a failed
+  network import blocked an entire page's interactivity, a destructuring bug that broke the
+  "add checklist item" button, a CSS cascade bug where `hidden` silently lost to component
+  `display` rules across most of the app's show/hide UI, and the WCAG contrast failure noted
+  above.
+- **Not run**: the true cross-device dispatch flow through a live Supabase project (real
+  PostgREST + `supabase-js` over HTTP, two actual devices). This environment's network policy
+  blocks Docker registry pulls, so `supabase start` cannot complete here. The database logic
+  underneath that flow was verified as described above; what's unverified is specifically the
+  PostgREST/supabase-js HTTP layer itself, which is third-party infrastructure outside this
+  codebase. Recommend running quickstart.md §3 and §8 by hand once against a real Supabase
+  project before considering this fully sign-off-ready.
