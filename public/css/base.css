@@ -6,6 +6,14 @@
   box-sizing: border-box;
 }
 
+/* The `hidden` attribute must win over any component class that sets its own `display`
+   (.stack, .row, .card, .btn, .category-grid, ...) — same-specificity author rules otherwise
+   override the browser's built-in [hidden] { display: none }, silently leaving the element
+   visible. */
+[hidden] {
+  display: none !important;
+}
+
 html {
   -webkit-text-size-adjust: 100%;
 }

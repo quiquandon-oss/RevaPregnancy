@@ -230,21 +230,21 @@ confirm access is lost immediately.
 
 ### Implementation for User Story 4
 
-- [ ] T045 [P] [US4] Create `public/js/models/support-member.js`: factory + validation for
+- [X] T045 [P] [US4] Create `public/js/models/support-member.js`: factory + validation for
       `SupportNetworkMember` per data-model.md
-- [ ] T046 [US4] Add `SupportNetworkMember` cache handling to `local-store.js` (depends on T012,
+- [X] T046 [US4] Add `SupportNetworkMember` cache handling to `local-store.js` (depends on T012,
       T045)
-- [ ] T047 [US4] Implement invite-create, `accept_invite` RPC, list, and revoke/permission-change
+- [X] T047 [US4] Implement invite-create, `accept_invite` RPC, list, and revoke/permission-change
       calls in `public/js/api-client.js` per contracts/api.md (depends on T014, T045)
-- [ ] T048 [US4] Build `public/support-network.html`: member list with permission level and
+- [X] T048 [US4] Build `public/support-network.html`: member list with permission level and
       revoke controls, plus invite-generation UI showing the shareable link/code (simulated
       delivery per FR-023), per blueprint screen P-02
-- [ ] T049 [US4] Implement `public/js/views/support-network.js`: create invite, list members
+- [X] T049 [US4] Implement `public/js/views/support-network.js`: create invite, list members
       (including pending), and wire revoke/permission-change actions (depends on T047, T048)
-- [ ] T050 [US4] Implement the invite-accept flow in `public/js/views/partner.js`: read the
+- [X] T050 [US4] Implement the invite-accept flow in `public/js/views/partner.js`: read the
       `?invite=` query parameter, call `accept_invite`, and persist the resulting session as this
       device's identity before showing the partner dispatch list (depends on T014, T026, T047)
-- [ ] T051 [US4] Extend `supabase/tests/rls-and-transitions.test.js` with cases for
+- [X] T051 [US4] Extend `supabase/tests/rls-and-transitions.test.js` with cases for
       `accept_invite` atomicity (a caller can't claim someone else's invite) and for a revoked
       member immediately losing dispatch access (depends on T011, T028)
 

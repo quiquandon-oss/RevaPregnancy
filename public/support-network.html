@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Support Network — Crave & Care</title>
+    <meta name="theme-color" content="#8fae8b" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="css/tokens.css" />
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/components.css" />
+  </head>
+  <body>
+    <main class="app-main stack">
+      <a href="profile.html" class="label">&larr; Profile</a>
+      <h1>Support Network</h1>
+      <p class="micro">
+        Invite a partner or someone you trust so they can receive and fulfill craving requests —
+        no account needed on their end.
+      </p>
+
+      <button class="btn btn-primary btn-block" id="create-invite">+ Invite someone</button>
+
+      <div id="new-invite-card" class="card stack" hidden>
+        <p>Share this link — it works for one person:</p>
+        <div class="row">
+          <input type="text" id="invite-link" readonly />
+          <button class="btn btn-outline" id="copy-invite-link">Copy</button>
+        </div>
+        <p class="micro">Sending it is up to you — text, message, however's easiest.</p>
+      </div>
+
+      <div class="stack" id="member-list"></div>
+      <p id="empty-members" class="micro" hidden>No one's been invited yet.</p>
+    </main>
+
+    <script type="module" src="js/views/support-network.js"></script>
+  </body>
+</html>
