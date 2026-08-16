@@ -84,21 +84,33 @@ function registerServiceWorker() {
 // to the resulting auth state change — first by telling every page a link/sign-in just
 // completed (profile.js listens for this to mark its own "linked" status), and separately, only
 // when this device has no local profile yet, by pulling down the existing Supabase-synced data
-// (dispatches, support-network members, comfort entries) so a genuinely new device ends up
-// showing the same data as the original one, per contracts/api.md's account-linking contract.
+// (dispatches, support-network members, comfort entries, Timeline memories) so a genuinely new
+// device ends up showing the same data as the original one, per contracts/api.md's
+// account-linking contract.
 async function handleResumeOnNewDevice(ownerId) {
   const existingProfile = await getProfile();
   if (existingProfile) return; // "link my current device" path — it already has all its data
 
-  const [{ refreshOwnerDispatches }, { refreshFromServer }, { refreshSupportNetwork }, { createProfile, acknowledgeDisclaimer }] =
-    await Promise.all([
-      import("./db/dispatch-store.js"),
-      import("./db/comfort-store.js"),
-      import("./db/support-store.js"),
-      import("./db/profile-store.js"),
-    ]);
+  const [
+    { refreshOwnerDispatches },
+    { refreshFromServer: refreshComfortFromServer },
+    { refreshSupportNetwork },
+    { createProfile, acknowledgeDisclaimer },
+    { refreshFromServer: refreshMemoriesFromServer },
+  ] = await Promise.all([
+    import("./db/dispatch-store.js"),
+    import("./db/comfort-store.js"),
+    import("./db/support-store.js"),
+    import("./db/profile-store.js"),
+    import("./db/memory-store.js"),
+  ]);
 
-  await Promise.all([refreshOwnerDispatches(ownerId), refreshFromServer(), refreshSupportNetwork(ownerId)]);
+  await Promise.all([
+    refreshOwnerDispatches(ownerId),
+    refreshComfortFromServer(),
+    refreshSupportNetwork(ownerId),
+    refreshMemoriesFromServer(),
+  ]);
 
   // Local-only profile fields (name, due date) never left the original device, so this device
   // needs a placeholder shell — the disclaimer was already acknowledged once by this same
@@ -121,16 +133,36 @@ function watchAuthState() {
   });
 }
 
+// Replays anything left in the offline sync queue (see db/sync-queue.js). This was previously
+// defined but never actually invoked anywhere in the app — queued writes (e.g. a dispatch
+// created while offline) would sit in IndexedDB indefinitely with nothing to send them once
+// connectivity returned. Wired up here, on every page, so it applies to all queued kinds, not
+// just the new memory-sync one this was added for.
+async function wireSyncQueue() {
+  const [{ dispatchSyncHandler }, { comfortSyncHandler }, { memorySyncHandler }, { replayQueue, watchConnectivity }] =
+    await Promise.all([
+      import("./db/dispatch-store.js"),
+      import("./db/comfort-store.js"),
+      import("./db/memory-store.js"),
+      import("./db/sync-queue.js"),
+    ]);
+  const handlers = { dispatch: dispatchSyncHandler, comfort: comfortSyncHandler, memory: memorySyncHandler };
+  const runReplay = () => replayQueue(handlers).catch(() => {});
+  runReplay(); // in case anything was queued last session and we're already online
+  watchConnectivity(runReplay);
+}
+
 export async function bootPage({ skipDisclaimerGate = false } = {}) {
   applyAccessibilityPreferences();
   renderBottomNav();
   registerServiceWorker();
   watchAuthState();
   // The disclaimer gate only reads local storage, so it resolves immediately; a page's own
-  // interactivity (button wiring, etc.) must never wait on the network. ensureSession() is
-  // deliberately NOT awaited here — it resolves in the background, and anything that actually
-  // needs the resulting identity (getCurrentIdentity(), in identity.js) awaits it lazily at the
-  // point of use instead, per constitution Principle V (offline-first).
+  // interactivity (button wiring, etc.) must never wait on the network. ensureSession() and
+  // wireSyncQueue() are deliberately NOT awaited here — they resolve in the background, and
+  // anything that actually needs the resulting identity (getCurrentIdentity(), in identity.js)
+  // awaits it lazily at the point of use instead, per constitution Principle V (offline-first).
   if (!skipDisclaimerGate) await enforceDisclaimerGate();
   ensureSession();
+  wireSyncQueue();
 }

@@ -181,6 +181,55 @@ export async function listOwnerComfortEntries(ownerId, limit = 30) {
 }
 
 // ---------------------------------------------------------------------------
+// Timeline memories (photos, ultrasounds, milestones) — synced, see
+// supabase/migrations/0003_memories_sync.sql. Photo binaries live in the "memories" Storage
+// bucket, not in this table; photo_path points at them. Providing `id` on insert (rather than
+// letting the DB default generate one) keeps the local device's id identical to the server's,
+// so there's no id-remapping step once a write syncs.
+// ---------------------------------------------------------------------------
+
+export async function createMemoryRecord({ id, title, date, category, note, photoPath }) {
+  return withClient((client) =>
+    client
+      .from("memories")
+      .insert({ id, title, date, category, note, photo_path: photoPath })
+      .select()
+      .single()
+  );
+}
+
+export async function deleteMemoryRecord(id) {
+  return withClient((client) => client.from("memories").delete().eq("id", id));
+}
+
+export async function listMyMemories(limit = 200) {
+  return withClient((client) => client.from("memories").select("*").order("date", { ascending: false }).limit(limit));
+}
+
+// For a full_support_access support-network member reading the owner's Timeline.
+export async function listOwnerMemories(ownerId, limit = 20) {
+  return withClient((client) =>
+    client.from("memories").select("*").eq("owner_id", ownerId).order("date", { ascending: false }).limit(limit)
+  );
+}
+
+export async function uploadMemoryPhoto(path, blob) {
+  return withClient((client) =>
+    client.storage.from("memories").upload(path, blob, { contentType: blob.type || "image/jpeg", upsert: true })
+  );
+}
+
+// The bucket is private, so viewing a photo (owner on another device, or a partner) needs a
+// short-lived signed URL rather than a plain public one.
+export async function getMemoryPhotoSignedUrl(path, expiresIn = 3600) {
+  return withClient((client) => client.storage.from("memories").createSignedUrl(path, expiresIn));
+}
+
+export async function deleteMemoryPhoto(path) {
+  return withClient((client) => client.storage.from("memories").remove([path]));
+}
+
+// ---------------------------------------------------------------------------
 // Account linking (optional, FR-031)
 // ---------------------------------------------------------------------------
 

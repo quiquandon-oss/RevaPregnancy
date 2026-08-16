@@ -16,18 +16,22 @@ pregnant person or the people she invites to help. Six core features:
 1. **Instant Craving Dispatch** — tap a category (salty/sweet/sour/etc.), send a request to
    yourself or a support-network member, track status (requested → accepted → on the way →
    delivered).
-2. **Comfort & Energy Check-in** — daily energy level + symptom/status tracking.
+2. **Comfort & Energy Check-in** — daily energy level + symptom/status tracking, synced.
 3. **Appointment Prep** — appointment ledger with prep checklists and a running question list.
-4. **Support Network** — invite a partner/friend via a link (no account needed on their end), with
-   a per-invite permission level chosen by the owner at creation time:
+   Local-only (device-only), by design — never been asked to sync this.
+4. **Support Network** — invite a partner/friend via a link (no account needed on their end),
+   with a per-invite permission level chosen by the owner at creation time:
    - `dispatch_recipient` (default): sees only the dispatches assigned to them.
-   - `full_support_access`: also sees the owner's mood/energy check-in history.
-   Neither level shows the full app — appointments, questions, profile, and Timeline photos
-   remain owner-only regardless of permission level (see §5's open item on Timeline sharing).
+   - `full_support_access`: also sees the owner's mood/energy check-ins **and Timeline**
+     (photos, ultrasounds, milestones).
+   Neither level shows the full app — appointments, questions, and profile stay owner-only
+   regardless of permission level.
 5. **Onboarding & Profile** — name/due date, disclaimer, optional email-based account linking for
    cross-device resume.
-6. **Full Journey Timeline** — a photo/ultrasound/milestone journal, local-only (never leaves the
-   device — see §5).
+6. **Full Journey Timeline** — a photo/ultrasound/milestone journal. Synced (compressed photos in
+   Supabase Storage + metadata in Postgres) so it survives device loss, resumes on a second
+   device, and is visible to `full_support_access` partners. Full-quality originals still stay
+   on the device that took them; only the synced copy is compressed (see §5).
 
 Plus: **WhatsApp invite sharing** — one-tap "Send via WhatsApp" button next to the invite link,
 and an optional label on each invite ("Who's this for?") so multiple pending invites are
@@ -36,8 +40,10 @@ identifiable before they're accepted.
 Built via the [GitHub Spec Kit](https://github.com/github/spec-kit) workflow
 (constitution → specify → plan → tasks → analyze → implement). All artifacts live in
 `specs/001-crave-and-care-mvp/` (spec.md, plan.md, data-model.md, contracts/api.md,
-quickstart.md, tasks.md). FR-022 was updated this session to reflect the two-tier partner view
-above — spec.md is the source of truth if this file and it ever disagree.
+quickstart.md, tasks.md). **`data-model.md` predates the Timeline feature and hasn't been
+updated for it or for the permission-tier changes** — spec.md's FR-022 and acceptance scenarios
+1-6 are current; data-model.md, tasks.md, and quickstart.md are not, and are worth formalizing
+if this project gets a "real" Spec Kit pass again rather than incremental chat-driven changes.
 
 ---
 
@@ -58,7 +64,9 @@ above — spec.md is the source of truth if this file and it ever disagree.
   already embedded in `public/js/api-client.js` (safe to be public — it's the client key, RLS
   does the real access control). If you have Supabase MCP tools available, `execute_sql` /
   `apply_migration` against project_id `zwxfmdhgnlhtkixfkdob` work directly — much faster than
-  guessing at DB state from the code alone.
+  guessing at DB state from the code alone. There's also a private `memories` Storage bucket
+  now (photo binaries; 3MB server-side cap) — no dedicated bucket-creation MCP tool exists, it
+  was created via `insert into storage.buckets (...)` inside a migration.
 - **PWA install**: works from any page, including `partner.html` (which has its own
   `partner-manifest.webmanifest` so an installed shortcut on a support-network member's phone
   reopens their own restricted view, not the owner's full app).
@@ -67,57 +75,69 @@ above — spec.md is the source of truth if this file and it ever disagree.
 
 ## 3. Known issues / open items
 
-1. **Timeline photos aren't shared with support-network members yet.** They're local-only
-   (IndexedDB, per-device, never synced — see §5) by original design, so there's currently no
-   server-side mechanism for a partner on a different device to see them at all, even with
-   `full_support_access`. Building this needs real new infrastructure (a Supabase Storage bucket
-   or similar, a synced table, RLS, upload/sync logic in `memory-store.js`, and a display section
-   in `partner.html`) — it's a genuinely bigger lift than the mood/energy sharing built this
-   session, which just reused existing sync. Flagged to the account owner as a follow-up; not
-   started.
-2. **No real push notifications exist.** "Notification preferences" on the Profile screen
+1. **No real push notifications exist.** "Notification preferences" on the Profile screen
    (`dispatchUpdates` / `comfortReminders`) is currently just a toggle with nothing behind it — no
    `Notification.requestPermission()`, no service worker push handler, no delivery mechanism.
    Someone asked about this expecting a phone alert on a new dispatch; that doesn't exist yet.
-3. **Anonymous Sign-Ins are now working** (previously the top item here — resolved as of this
-   session; `select count(*) from auth.users` returns real rows). If a fresh session ever sees
-   auth-dependent features failing again, re-check this first before assuming it's something else,
-   but don't assume it's broken by default anymore.
+2. **Deleting a synced memory is best-effort, not queued.** If you delete a Timeline entry while
+   offline (or the delete call fails), the local copy is gone immediately but the remote
+   row/photo can be left behind — deletes aren't retried like creates are (see
+   `js/db/memory-store.js`'s `deleteMemory`). A deliberate scope cut, not an oversight; revisit
+   if stray remote rows become an actual problem.
+3. **`supabase/tests/rls-and-transitions.test.js` hasn't been updated** for the 0002 (comfort
+   access) or 0003 (memories) migrations — it only exercises the original 0001 schema.
+4. **Anonymous Sign-Ins, once a blocker, now work fine** — resolved a couple of sessions ago.
+   Don't assume it's broken by default anymore; if auth-dependent features ever fail again,
+   `select count(*) from auth.users` is the fastest way to check.
 
 ---
 
-## 4. Recent debugging history (this session)
+## 4. Recent debugging/feature history (most recent session first)
 
-Several bugs traced back to the **same root cause repeated four times**: this is a GitHub Pages
-*project* site (lives at `/RevaPregnancy/`, not domain root), and several places in the code
-assumed root-absolute paths or `window.location.origin` alone. Watch for this pattern in
-anything new:
-1. `inviteLink()` used `window.location.origin` alone → generated links like
-   `https://quiquandon-oss.github.io/partner.html?invite=CODE` (missing `/RevaPregnancy/`) → 404.
-   Fixed by deriving the base path from the current page's own location instead.
-2. `manifest.webmanifest`'s `start_url`/`scope` were root-absolute (`/index.html`, `/`) → PWA
-   install 404'd for everyone, including support-network members installing from
-   `partner.html`. Fixed with page-relative values, and split `partner.html` onto its own
-   manifest so its install target is itself, not the owner's `index.html`.
-3. The onboarding "Invite someone now" button navigated to `support-network.html`, which enforces
-   the disclaimer gate (FR-025) — but per FR-024's required step order, invite happens *before*
-   disclaimer, so it silently bounced back to onboarding's welcome screen. Fixed by building the
-   invite UI inline into the onboarding step itself (exempt from the gate) instead of navigating
-   away.
-4. Separately (not the path bug): a few test invites got created and revoked within seconds of
-   each other during manual testing — confirmed via direct DB query, not a code bug. Worth
-   knowing the "Invite someone now" button doesn't yet disable itself on click, so a slow network
-   response plus impatient re-tapping could still create duplicate invites.
+**This session — expanded support-network access, twice:**
+1. First pass: added a permission-level picker to both invite flows
+   (`dispatch_recipient` / `full_support_access`), and a new RLS policy
+   (`0002_support_member_comfort_access.sql`) so `full_support_access` members can read the
+   owner's `comfort_entries`. `partner.html` got a mood/energy section.
+2. Second pass: **Timeline photo sync**, the bigger of the two. Built from scratch since photos
+   were previously local-only with zero server infrastructure:
+   - New private Storage bucket `memories` (3MB file-size cap) + new `memories` table
+     (`0003_memories_sync.sql`), RLS mirroring the comfort_entries pattern (owner + accepted
+     `full_support_access` members).
+   - `js/lib/image-compress.js`: canvas-based client-side compression (max 1600px, JPEG q=0.82)
+     before upload — the size cap the account owner asked for.
+   - `js/db/memory-store.js` rewritten from local-only to the same offline-first
+     cache-then-sync pattern as `dispatch-store.js`/`comfort-store.js`: local IndexedDB is
+     still the source of truth for instant/offline display; a compressed copy + metadata row
+     also gets pushed to Supabase when online, or queued (`kind: 'memory'`) when not.
+   - **Found and fixed a real, unrelated gap while wiring this up**: `sync-queue.js`'s
+     `replayQueue()` existed and was already used by `dispatch-store.js`/`comfort-store.js` to
+     *enqueue* failed writes, but was never actually *called* anywhere — queued offline writes
+     just sat in IndexedDB forever with nothing to replay them. Wired up in `app.js`'s
+     `bootPage()` (runs once on boot + on reconnect via `watchConnectivity`). This fixes offline
+     retry for dispatches and comfort entries too, not just the new memory sync.
+   - `partner.html`/`partner.js` got a Timeline section for `full_support_access` members —
+     photos are shown via short-lived signed URLs (the bucket is private), regenerated each
+     20s poll.
+   - `app.js`'s new-device resume flow (`handleResumeOnNewDevice`) now also pulls down
+     memories, so Timeline survives a lost/reset device like the other synced entities.
+   - `spec.md` FR-022 + acceptance scenarios updated again to mention Timeline.
 
-Then, at the account owner's request, partner access was expanded beyond dispatches-only:
-- Added a per-invite permission picker (`dispatch_recipient` vs `full_support_access`) to both
-  invite-creation flows.
-- New RLS policy (`supabase/migrations/0002_support_member_comfort_access.sql`) lets accepted
-  `full_support_access` members read the owner's `comfort_entries`.
-- `partner.html` now shows a mood/energy section for members with that permission level, refreshed
-  alongside the existing dispatch poll.
-- `spec.md` FR-022 and its acceptance scenarios updated to match (was previously
-  dispatches-only, stated as a hard restriction).
+**Earlier this session — the same root-cause bug, four times.** This is a GitHub Pages
+*project* site (lives at `/RevaPregnancy/`, not domain root); several places assumed root-absolute
+paths or `window.location.origin` alone. Watch for this pattern in anything new:
+- `inviteLink()` used `window.location.origin` alone → broken invite links → fixed with a
+  page-relative base path.
+- `manifest.webmanifest`'s `start_url`/`scope` were root-absolute → PWA install 404'd → fixed
+  with relative values, and `partner.html` split onto its own manifest (`partner-manifest.
+  webmanifest`) so its install target is itself, not the owner's `index.html`.
+- Onboarding's "Invite someone now" navigated to `support-network.html`, which enforces the
+  disclaimer gate (FR-025) — but invite happens *before* disclaimer per FR-024's step order, so
+  it silently bounced back to onboarding's welcome screen. Fixed by building the invite UI
+  inline into the onboarding step itself (exempt from the gate).
+- (Not the path bug, but related testing note): a few test invites were created and revoked
+  within seconds of each other during manual testing — confirmed via direct DB query, not a
+  code bug, just worth knowing "Invite someone now" doesn't debounce/disable itself on click.
 
 ---
 
@@ -131,29 +151,38 @@ Then, at the account owner's request, partner access was expanded beyond dispatc
   `withClient()`), and `bootPage()` never awaits network calls. A service worker
   (`service-worker.js`, stale-while-revalidate) precaches the full app shell — bump `CACHE_NAME`
   whenever `CORE_ASSETS` changes *or* whenever the content of an already-listed file changes, or
-  returning visitors keep seeing stale/broken behavior from cache. Current version: `v7`.
+  returning visitors keep seeing stale/broken behavior from cache. Current version: `v9`.
+- **Offline write queue is now actually wired up** (`sync-queue.js`'s `replayQueue`, called from
+  `app.js`'s `bootPage()`) — see §4. Used by `dispatch`, `comfort`, and `memory` kinds.
+  `support-store.js` doesn't use it at all (invite/accept/revoke calls just throw on failure,
+  no offline queueing) — that's pre-existing, not something this session touched.
 - **Path discipline**: always use paths relative to the current file (`index.html`, not
   `/index.html`; `window.location.pathname`-derived bases, not bare `window.location.origin`) —
   see §4's repeated root-cause pattern. This app is deployed under a subpath; nothing should
   assume it lives at the domain root.
 - **What syncs vs. stays local:**
-  - Synced via Supabase (Postgres + RLS): dispatches, support-network members, comfort entries.
-  - Local-only (IndexedDB, never leaves device): appointments, questions, profile, and Timeline
-    memories/photos (see §3, item 1 — this is the next likely ask).
-- **Two "logged in" experiences on the same Supabase project, now with a permission split on one
-  of them:**
+  - Synced via Supabase (Postgres + RLS, plus Storage for memories' photos): dispatches,
+    support-network members, comfort entries, Timeline memories.
+  - Local-only (IndexedDB, never leaves device): appointments, questions, profile.
+  - Timeline photos specifically: the **full-quality original** stays local-only on the device
+    that captured it (never uploaded); a **compressed copy** (max 1600px, JPEG q=0.82, capped at
+    3MB server-side) is what actually syncs. A device that pulls a memory down via
+    `refreshFromServer()` gets the compressed version, not the original.
+- **Two "logged in" experiences on the same Supabase project, with a permission split on one:**
   - The pregnant woman: full app, own anonymous session, sees everything she owns, own PWA
     manifest (`manifest.webmanifest`, `start_url: index.html`).
   - An invited support-network member: `partner.html?invite=CODE`, a separate restricted view
     with its own manifest (`partner-manifest.webmanifest`, `start_url: partner.html`). What they
     see depends on the permission level the owner chose at invite time — dispatches only, or
-    dispatches + mood/energy. Never the full app (appointments/questions/profile/Timeline stay
-    owner-only regardless of level).
-- **RLS is the real security boundary**, not the app code. See
-  `supabase/migrations/0001_init.sql` for the original schema/policies and `0002_*.sql` for the
-  comfort-access addition; `supabase/tests/rls-and-transitions.test.js` exercises them against a
-  real Postgres instance (needs `supabase start`, i.e. Docker — see README for local dev; that
-  test file has *not* been updated for the 0002 migration yet).
+    dispatches + mood/energy + Timeline. Never the full app (appointments/questions/profile stay
+    owner-only regardless of level). `partner.js` re-checks the member's own permission level
+    from the server on every refresh (not cached), since the owner can change it later via the
+    already-existing (if UI-unwired for *changing* an existing member) `updatePermissionLevel()`.
+- **RLS is the real security boundary**, not the app code. `supabase/migrations/`:
+  `0001_init.sql` (original schema/policies), `0002_support_member_comfort_access.sql`
+  (comfort_entries → full_support_access members), `0003_memories_sync.sql` (memories table +
+  Storage bucket + policies). `supabase/tests/rls-and-transitions.test.js` only covers 0001 (see
+  §3, item 3).
 
 ---
 
@@ -168,21 +197,26 @@ public/                      # entire frontend — static, deployable anywhere
   partner-manifest.webmanifest  # support-network member's PWA manifest (start_url: partner.html)
   css/tokens.css                # design tokens ("Modern Nurturing": sage green + dusty rose)
   css/base.css, components.css  # resets + reusable component classes
-  js/api-client.js              # all Supabase calls, lazy-loaded, fail-soft
-  js/app.js                     # shared boot: bottom nav, disclaimer gate, a11y prefs, session
+  js/api-client.js              # all Supabase calls (Postgres + Storage), lazy-loaded, fail-soft
+  js/app.js                     # shared boot: bottom nav, disclaimer gate, a11y prefs, session,
+                                 #   new-device resume, offline sync-queue wiring
   js/identity.js                # resolves current Supabase Auth identity
-  js/db/                        # one IndexedDB/localStorage store module per entity
+  js/lib/image-compress.js      # canvas-based photo compression before Storage upload
+  js/db/                        # one IndexedDB/localStorage + sync module per entity
   js/models/                    # pure factory/validation functions, no I/O
   js/views/                     # one controller module per page
-  service-worker.js             # offline app-shell caching, CACHE_NAME v7
+  service-worker.js             # offline app-shell caching, CACHE_NAME v9
 
 supabase/migrations/
-  0001_init.sql                       # schema + RLS + status trigger + accept_invite() RPC
-  0002_support_member_comfort_access.sql   # RLS: full_support_access members can read comfort_entries
-supabase/tests/                      # RLS/transition tests (node --test, needs local Supabase)
+  0001_init.sql                            # schema + RLS + status trigger + accept_invite() RPC
+  0002_support_member_comfort_access.sql   # RLS: full_support_access members read comfort_entries
+  0003_memories_sync.sql                   # memories table + Storage bucket + RLS
+supabase/tests/                      # RLS/transition tests — only covers 0001 (see §3)
 tests/unit/*.test.html               # browser-run assertion pages, open directly
 
-specs/001-crave-and-care-mvp/        # spec, plan, data model, API contract, tasks (Spec Kit)
+specs/001-crave-and-care-mvp/        # spec, plan, data model, API contract, tasks (Spec Kit) —
+                                      #   spec.md is current; data-model.md/tasks.md/quickstart.md
+                                      #   predate Timeline + permission tiers (see §1)
 .github/workflows/deploy-pages.yml   # GitHub Pages CI/CD, triggers on push to main
 ```
 
@@ -192,19 +226,18 @@ specs/001-crave-and-care-mvp/        # spec, plan, data model, API contract, tas
 
 1. **Check §3** for currently-known open items before assuming something's broken or working.
 2. **Deploys are automatic** on push to `main` — no separate "deploy" step needed, just commit and
-   push, then check the Actions tab (or ask the account owner to hard-refresh / fully close and
+   push, then check the Actions tab (or ask whoever's testing to hard-refresh / fully close and
    reopen the tab, since the service worker caches aggressively).
 3. **Don't add a framework or CDN dependency** without checking — this is a deliberate
    architectural constraint (see §5), not an oversight.
 4. **Watch for the root-absolute-path bug pattern** (§4) in anything new — it's bitten this
-   project four separate times already.
+   project multiple times already.
 5. **Multiple people test this app** (the account owner, plus whoever they've invited — e.g. a
    partner, a parent). Confirm who you're talking to before making account/architecture-level
    decisions, and don't assume a phone described in conversation belongs to the account owner.
-6. **Timeline photo sharing with partners is the most likely next ask** (§3, item 1) — it's a
-   real infrastructure addition (Storage bucket, sync, RLS, UI), not a quick fix. Worth sizing
-   and confirming the approach (storage bucket vs. inline, size caps, etc.) with the account
-   owner before building rather than guessing.
-7. Full task-by-task build history: `specs/001-crave-and-care-mvp/tasks.md`. Manual QA walkthrough
-   for all five original stories: `specs/001-crave-and-care-mvp/quickstart.md` (not yet updated
-   for the permission-tier or comfort-sharing changes).
+6. **A likely next ask**: letting the owner change an *existing* member's permission level from
+   the Support Network screen — the backend function (`updatePermissionLevel()`) already exists
+   and is unused; only the UI to call it is missing.
+7. Full task-by-task build history: `specs/001-crave-and-care-mvp/tasks.md` (stale, see §1).
+   Manual QA walkthrough for all five *original* stories: `specs/001-crave-and-care-mvp/
+   quickstart.md` (also stale — doesn't cover permission tiers or Timeline sync).

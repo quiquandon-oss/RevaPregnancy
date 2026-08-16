@@ -1,5 +1,7 @@
 // Factory + validation for Timeline memories — photos, ultrasounds, and milestone notes.
-// Local-only (see db/memory-store.js): photos can be large, so these never leave the device.
+// Kept locally at full quality for instant offline display; also synced (compressed) to
+// Supabase so other devices and full_support_access partners can see them — see
+// db/memory-store.js.
 
 export const MEMORY_CATEGORIES = ["photo", "ultrasound", "milestone"];
 

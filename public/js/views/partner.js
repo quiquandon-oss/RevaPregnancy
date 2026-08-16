@@ -4,7 +4,8 @@ import { acceptInviteAsThisDevice, getThisDeviceMemberRowId, refreshThisDeviceMe
 import { refreshAssigneeDispatches, getCachedDispatches, updateStatus } from "../db/dispatch-store.js";
 import { CATEGORY_LABELS, statusLabel, isActive, canTransition } from "../models/dispatch.js";
 import { ENERGY_LABELS } from "../models/comfort-entry.js";
-import { listOwnerComfortEntries } from "../api-client.js";
+import { CATEGORY_ICONS as MEMORY_ICONS } from "../models/memory.js";
+import { listOwnerComfortEntries, listOwnerMemories, getMemoryPhotoSignedUrl } from "../api-client.js";
 
 const POLL_INTERVAL_MS = 20000;
 
@@ -81,10 +82,9 @@ function renderComfort(entries) {
 // Full_support_access is opt-in per invite (the owner chooses this when creating the
 // invite), so re-checks the member's own record from the server each time rather than
 // trusting a locally-cached permission level — the owner can also change it later.
-async function refreshComfortIfEligible() {
-  const member = await refreshThisDeviceMember();
+async function refreshComfortIfEligible(member) {
   const section = document.getElementById("comfort-section");
-  if (!member || member.status !== "accepted" || member.permissionLevel !== "full_support_access") {
+  if (!member) {
     section.hidden = true;
     return;
   }
@@ -95,9 +95,62 @@ async function refreshComfortIfEligible() {
   }
 }
 
+function renderTimeline(entries) {
+  const list = document.getElementById("timeline-list");
+  const empty = document.getElementById("empty-timeline");
+  list.innerHTML = "";
+  empty.hidden = entries.length > 0;
+
+  for (const entry of entries) {
+    const article = document.createElement("article");
+    article.className = "timeline-entry";
+    article.innerHTML = `
+      <div class="timeline-entry__marker">
+        <div class="timeline-entry__icon" aria-hidden="true">${MEMORY_ICONS[entry.category] || "💛"}</div>
+        <span class="micro">${entry.date}</span>
+      </div>
+      <div class="timeline-entry__body card">
+        <h3 style="margin-bottom: 4px">${entry.title}</h3>
+        ${entry.note ? `<p class="micro">${entry.note}</p>` : ""}
+        ${entry.photoUrl ? `<div class="timeline-entry__photo"><img src="${entry.photoUrl}" alt="${entry.title}" /></div>` : ""}
+      </div>
+    `;
+    list.appendChild(article);
+  }
+}
+
+// Photos live in a private Storage bucket, so each one needs its own short-lived signed URL —
+// fetched fresh on every refresh rather than cached, since this poll interval (20s) is already
+// long enough that a cached URL nearing expiry isn't worth the extra bookkeeping.
+async function refreshTimelineIfEligible(member) {
+  const section = document.getElementById("timeline-section");
+  if (!member) {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+  const { data, error } = await listOwnerMemories(member.ownerId);
+  if (error || !data) return;
+
+  const entries = await Promise.all(
+    data.map(async (row) => {
+      let photoUrl = null;
+      if (row.photo_path) {
+        const { data: signed } = await getMemoryPhotoSignedUrl(row.photo_path);
+        photoUrl = signed?.signedUrl || null;
+      }
+      return { date: row.date, title: row.title, category: row.category, note: row.note, photoUrl };
+    })
+  );
+  renderTimeline(entries);
+}
+
 async function refreshAll() {
   await refresh();
-  await refreshComfortIfEligible();
+  const member = await refreshThisDeviceMember();
+  const eligible = member && member.status === "accepted" && member.permissionLevel === "full_support_access" ? member : null;
+  await refreshComfortIfEligible(eligible);
+  await refreshTimelineIfEligible(eligible);
 }
 
 async function handleInviteAcceptance(inviteCode) {

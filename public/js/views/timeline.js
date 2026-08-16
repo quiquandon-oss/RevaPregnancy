@@ -1,5 +1,5 @@
 import { bootPage } from "../app.js";
-import { listMemories, saveMemory, deleteMemory } from "../db/memory-store.js";
+import { saveMemory, deleteMemory, refreshFromServer } from "../db/memory-store.js";
 import { createMemory, validateMemoryInput, CATEGORY_LABELS, CATEGORY_ICONS } from "../models/memory.js";
 
 let allMemories = [];
@@ -45,7 +45,7 @@ function renderList() {
 }
 
 async function refresh() {
-  allMemories = await listMemories();
+  allMemories = await refreshFromServer();
   renderList();
 }
 
