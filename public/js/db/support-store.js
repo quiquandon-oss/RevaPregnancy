@@ -59,6 +59,26 @@ export function getThisDeviceMemberRowId() {
   return localStorage.getItem(MEMBER_ROW_ID_KEY);
 }
 
+// The partner's own membership record — their permission level and which owner they belong
+// to. Reads from local cache first (works offline); refreshThisDeviceMember() pulls the
+// latest from the server, since the owner can change permission level after acceptance.
+export async function getThisDeviceMember() {
+  const id = getThisDeviceMemberRowId();
+  if (!id) return null;
+  const all = await getCachedMembers();
+  return all.find((m) => m.id === id) || null;
+}
+
+export async function refreshThisDeviceMember() {
+  const id = getThisDeviceMemberRowId();
+  if (!id) return null;
+  const { data, error } = await api.getSupportMember(id);
+  if (error || !data) return getThisDeviceMember();
+  const record = fromApiRow(data);
+  await put(STORE, record);
+  return record;
+}
+
 export async function revokeMember(memberId) {
   const { data, error } = await api.updateSupportMember(memberId, { status: "revoked" });
   if (error) throw error;

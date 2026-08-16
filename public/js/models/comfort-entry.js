@@ -2,6 +2,8 @@
 
 export const ENERGY_LEVELS = ["low", "moderate", "full"];
 
+export const ENERGY_LABELS = { low: "Low", moderate: "Moderate", full: "Full" };
+
 export function validateComfortStatusInput({ label }) {
   const errors = [];
   if (!label || !label.trim()) errors.push("Give this a short label.");

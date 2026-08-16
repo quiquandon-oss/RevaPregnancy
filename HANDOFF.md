@@ -4,35 +4,40 @@
 where this session left off, without needing to re-explain the project. It covers what the app
 is, what's live, what's broken, and what to do next.
 
-Last updated: 2026-08-16, commit `df5bf5d` on branch `main`.
+Last updated: 2026-08-16, commit `<REPLACE_ME>` on branch `main`.
 
 ---
 
 ## 1. What this is
 
 **Crave & Care** is a calm, supportive pregnancy-companion PWA. No signup required for the
-pregnant person or the people she invites to help. Five core features:
+pregnant person or the people she invites to help. Six core features:
 
 1. **Instant Craving Dispatch** — tap a category (salty/sweet/sour/etc.), send a request to
    yourself or a support-network member, track status (requested → accepted → on the way →
    delivered).
 2. **Comfort & Energy Check-in** — daily energy level + symptom/status tracking.
 3. **Appointment Prep** — appointment ledger with prep checklists and a running question list.
-4. **Support Network** — invite a partner/friend via a link (no account needed on their end);
-   they get a restricted view showing only what's been asked of them.
+4. **Support Network** — invite a partner/friend via a link (no account needed on their end), with
+   a per-invite permission level chosen by the owner at creation time:
+   - `dispatch_recipient` (default): sees only the dispatches assigned to them.
+   - `full_support_access`: also sees the owner's mood/energy check-in history.
+   Neither level shows the full app — appointments, questions, profile, and Timeline photos
+   remain owner-only regardless of permission level (see §5's open item on Timeline sharing).
 5. **Onboarding & Profile** — name/due date, disclaimer, optional email-based account linking for
    cross-device resume.
-
-Plus, added in this latest session:
-
 6. **Full Journey Timeline** — a photo/ultrasound/milestone journal, local-only (never leaves the
-   device — see §6).
-7. **WhatsApp invite sharing** — one-tap "Send via WhatsApp" button next to the invite link.
+   device — see §5).
+
+Plus: **WhatsApp invite sharing** — one-tap "Send via WhatsApp" button next to the invite link,
+and an optional label on each invite ("Who's this for?") so multiple pending invites are
+identifiable before they're accepted.
 
 Built via the [GitHub Spec Kit](https://github.com/github/spec-kit) workflow
 (constitution → specify → plan → tasks → analyze → implement). All artifacts live in
 `specs/001-crave-and-care-mvp/` (spec.md, plan.md, data-model.md, contracts/api.md,
-quickstart.md, tasks.md — 64 tasks, all complete).
+quickstart.md, tasks.md). FR-022 was updated this session to reflect the two-tier partner view
+above — spec.md is the source of truth if this file and it ever disagree.
 
 ---
 
@@ -51,59 +56,68 @@ quickstart.md, tasks.md — 64 tasks, all complete).
 - **Backend**: Supabase project `zwxfmdhgnlhtkixfkdob` ("crave-and-care"). Dashboard:
   `https://supabase.com/dashboard/project/zwxfmdhgnlhtkixfkdob`. The anon/publishable key is
   already embedded in `public/js/api-client.js` (safe to be public — it's the client key, RLS
-  does the real access control).
+  does the real access control). If you have Supabase MCP tools available, `execute_sql` /
+  `apply_migration` against project_id `zwxfmdhgnlhtkixfkdob` work directly — much faster than
+  guessing at DB state from the code alone.
+- **PWA install**: works from any page, including `partner.html` (which has its own
+  `partner-manifest.webmanifest` so an installed shortcut on a support-network member's phone
+  reopens their own restricted view, not the owner's full app).
 
 ---
 
-## 3. ⚠️ Known blocker — read this first
+## 3. Known issues / open items
 
-**Anonymous Sign-Ins are still disabled on the Supabase project.** This blocks almost everything
-that needs a session: creating a support-network invite, and (once synced) dispatches/comfort
-history. Confirmed directly from the project's auth logs — every `/signup` (anonymous sign-in)
-attempt fails with:
-
-```
-422: Anonymous sign-ins are disabled
-error_code: anonymous_provider_disabled
-```
-
-Zero users have ever been created on this project (`select count(*) from auth.users` → 0), which
-means this has never actually been successfully turned on, despite it looking toggled-on in past
-conversations with the account owner.
-
-**Fix** (dashboard-only, no CLI/API way to do this — a real person with project access has to
-click it):
-1. Go to `https://supabase.com/dashboard/project/zwxfmdhgnlhtkixfkdob/auth/providers`
-2. Find **Anonymous Sign-Ins**, toggle it **on**.
-3. Look for an explicit **Save** — this is the step that's easy to miss and silently reverts if
-   skipped.
-4. Refresh the settings page and confirm the toggle still shows on.
-5. Verify by checking `auth.users` — a successful anonymous sign-in from the live app should
-   produce a new row.
-
-Until this is fixed, "Invite someone" (and anything else touching Supabase) will show the gentle
-error message added in commit `a7d9646`: *"That didn't go through — check your connection and
-try again in a moment."* That message is accurate-but-vague on purpose (see next section); the
-real cause is always worth checking against the auth logs first.
+1. **Timeline photos aren't shared with support-network members yet.** They're local-only
+   (IndexedDB, per-device, never synced — see §5) by original design, so there's currently no
+   server-side mechanism for a partner on a different device to see them at all, even with
+   `full_support_access`. Building this needs real new infrastructure (a Supabase Storage bucket
+   or similar, a synced table, RLS, upload/sync logic in `memory-store.js`, and a display section
+   in `partner.html`) — it's a genuinely bigger lift than the mood/energy sharing built this
+   session, which just reused existing sync. Flagged to the account owner as a follow-up; not
+   started.
+2. **No real push notifications exist.** "Notification preferences" on the Profile screen
+   (`dispatchUpdates` / `comfortReminders`) is currently just a toggle with nothing behind it — no
+   `Notification.requestPermission()`, no service worker push handler, no delivery mechanism.
+   Someone asked about this expecting a phone alert on a new dispatch; that doesn't exist yet.
+3. **Anonymous Sign-Ins are now working** (previously the top item here — resolved as of this
+   session; `select count(*) from auth.users` returns real rows). If a fresh session ever sees
+   auth-dependent features failing again, re-check this first before assuming it's something else,
+   but don't assume it's broken by default anymore.
 
 ---
 
 ## 4. Recent debugging history (this session)
 
-1. User (account owner) reported "add a contact" not working. Traced to two independent issues:
-   - **Code bug** (fixed, commit `a7d9646`): the invite-creation button had no error handling at
-     all — any failure produced zero user feedback. Now shows a gentle error message.
-   - **Infra issue** (still open, see §3): Anonymous Sign-Ins disabled server-side.
-2. A second person — the invited "contact" (support-network member), not the account owner —
-   joined the conversation reporting a GitHub 404 when opening a link received via WhatsApp.
-   Root cause: WhatsApp-forwarded links had gotten case-mangled/truncated; the real URL (§2)
-   worked fine when typed fresh. Not a code or infra bug — just a URL-transcription trap worth
-   knowing about.
-3. That contact then requested, with the account owner's live sign-off: a Full Journey Timeline
-   feature (from a Tailwind/Google-Fonts-CDN mockup they pasted) and WhatsApp share for invites.
-   Both were built — see commit `df5bf5d` — but the Timeline visuals were **rebuilt using the
-   existing local CSS token system** rather than the pasted Tailwind/CDN code, to preserve the
-   app's offline-first requirement (a CDN-dependent page would go blank with no signal).
+Several bugs traced back to the **same root cause repeated four times**: this is a GitHub Pages
+*project* site (lives at `/RevaPregnancy/`, not domain root), and several places in the code
+assumed root-absolute paths or `window.location.origin` alone. Watch for this pattern in
+anything new:
+1. `inviteLink()` used `window.location.origin` alone → generated links like
+   `https://quiquandon-oss.github.io/partner.html?invite=CODE` (missing `/RevaPregnancy/`) → 404.
+   Fixed by deriving the base path from the current page's own location instead.
+2. `manifest.webmanifest`'s `start_url`/`scope` were root-absolute (`/index.html`, `/`) → PWA
+   install 404'd for everyone, including support-network members installing from
+   `partner.html`. Fixed with page-relative values, and split `partner.html` onto its own
+   manifest so its install target is itself, not the owner's `index.html`.
+3. The onboarding "Invite someone now" button navigated to `support-network.html`, which enforces
+   the disclaimer gate (FR-025) — but per FR-024's required step order, invite happens *before*
+   disclaimer, so it silently bounced back to onboarding's welcome screen. Fixed by building the
+   invite UI inline into the onboarding step itself (exempt from the gate) instead of navigating
+   away.
+4. Separately (not the path bug): a few test invites got created and revoked within seconds of
+   each other during manual testing — confirmed via direct DB query, not a code bug. Worth
+   knowing the "Invite someone now" button doesn't yet disable itself on click, so a slow network
+   response plus impatient re-tapping could still create duplicate invites.
+
+Then, at the account owner's request, partner access was expanded beyond dispatches-only:
+- Added a per-invite permission picker (`dispatch_recipient` vs `full_support_access`) to both
+  invite-creation flows.
+- New RLS policy (`supabase/migrations/0002_support_member_comfort_access.sql`) lets accepted
+  `full_support_access` members read the owner's `comfort_entries`.
+- `partner.html` now shows a mood/energy section for members with that permission level, refreshed
+  alongside the existing dispatch poll.
+- `spec.md` FR-022 and its acceptance scenarios updated to match (was previously
+  dispatches-only, stated as a hard restriction).
 
 ---
 
@@ -116,20 +130,30 @@ real cause is always worth checking against the auth logs first.
   are lazy dynamic imports wrapped so they never throw synchronously (`api-client.js`'s
   `withClient()`), and `bootPage()` never awaits network calls. A service worker
   (`service-worker.js`, stale-while-revalidate) precaches the full app shell — bump `CACHE_NAME`
-  whenever `CORE_ASSETS` changes, or returning visitors keep seeing a stale mixed cache.
+  whenever `CORE_ASSETS` changes *or* whenever the content of an already-listed file changes, or
+  returning visitors keep seeing stale/broken behavior from cache. Current version: `v7`.
+- **Path discipline**: always use paths relative to the current file (`index.html`, not
+  `/index.html`; `window.location.pathname`-derived bases, not bare `window.location.origin`) —
+  see §4's repeated root-cause pattern. This app is deployed under a subpath; nothing should
+  assume it lives at the domain root.
 - **What syncs vs. stays local:**
   - Synced via Supabase (Postgres + RLS): dispatches, support-network members, comfort entries.
-  - Local-only (IndexedDB, never leaves device): appointments, questions, profile, and the new
-    Timeline memories (photos can be large; syncing them wasn't in scope for this pass).
-- **Two very different "logged in" experiences on the same Supabase project:**
-  - The pregnant woman: full app, own anonymous session, sees everything she owns.
-  - An invited support-network member: `partner.html?invite=CODE`, a completely separate,
-    restricted view — only their assigned dispatches, no access to anything else. This is already
-    built; it just hasn't been reachable end-to-end because of the §3 blocker.
+  - Local-only (IndexedDB, never leaves device): appointments, questions, profile, and Timeline
+    memories/photos (see §3, item 1 — this is the next likely ask).
+- **Two "logged in" experiences on the same Supabase project, now with a permission split on one
+  of them:**
+  - The pregnant woman: full app, own anonymous session, sees everything she owns, own PWA
+    manifest (`manifest.webmanifest`, `start_url: index.html`).
+  - An invited support-network member: `partner.html?invite=CODE`, a separate restricted view
+    with its own manifest (`partner-manifest.webmanifest`, `start_url: partner.html`). What they
+    see depends on the permission level the owner chose at invite time — dispatches only, or
+    dispatches + mood/energy. Never the full app (appointments/questions/profile/Timeline stay
+    owner-only regardless of level).
 - **RLS is the real security boundary**, not the app code. See
-  `supabase/migrations/0001_init.sql` for policies; `supabase/tests/rls-and-transitions.test.js`
-  exercises them against a real Postgres instance (needs `supabase start`, i.e. Docker — see
-  README for local dev).
+  `supabase/migrations/0001_init.sql` for the original schema/policies and `0002_*.sql` for the
+  comfort-access addition; `supabase/tests/rls-and-transitions.test.js` exercises them against a
+  real Postgres instance (needs `supabase start`, i.e. Docker — see README for local dev; that
+  test file has *not* been updated for the 0002 migration yet).
 
 ---
 
@@ -138,8 +162,10 @@ real cause is always worth checking against the auth logs first.
 ```text
 public/                      # entire frontend — static, deployable anywhere
   *.html                       # one file per screen (index=Home, comfort, care=Appointment
-                                #   Ledger, timeline=new Journey feature, support-network,
+                                #   Ledger, timeline=Journey feature, support-network,
                                 #   partner=invited-member view, profile, onboarding)
+  manifest.webmanifest          # owner's PWA manifest (start_url: index.html)
+  partner-manifest.webmanifest  # support-network member's PWA manifest (start_url: partner.html)
   css/tokens.css                # design tokens ("Modern Nurturing": sage green + dusty rose)
   css/base.css, components.css  # resets + reusable component classes
   js/api-client.js              # all Supabase calls, lazy-loaded, fail-soft
@@ -148,9 +174,11 @@ public/                      # entire frontend — static, deployable anywhere
   js/db/                        # one IndexedDB/localStorage store module per entity
   js/models/                    # pure factory/validation functions, no I/O
   js/views/                     # one controller module per page
-  service-worker.js             # offline app-shell caching
+  service-worker.js             # offline app-shell caching, CACHE_NAME v7
 
-supabase/migrations/0001_init.sql   # schema + RLS + status trigger + accept_invite() RPC
+supabase/migrations/
+  0001_init.sql                       # schema + RLS + status trigger + accept_invite() RPC
+  0002_support_member_comfort_access.sql   # RLS: full_support_access members can read comfort_entries
 supabase/tests/                      # RLS/transition tests (node --test, needs local Supabase)
 tests/unit/*.test.html               # browser-run assertion pages, open directly
 
@@ -162,17 +190,21 @@ specs/001-crave-and-care-mvp/        # spec, plan, data model, API contract, tas
 
 ## 7. If you're a fresh Claude session picking this up
 
-1. **Check §3 first** — has Anonymous Sign-Ins actually been turned on yet? If you have Supabase
-   MCP tools available, query `select count(*) from auth.users` — if it's still 0, nothing
-   downstream of auth will work regardless of what else you fix.
+1. **Check §3** for currently-known open items before assuming something's broken or working.
 2. **Deploys are automatic** on push to `main` — no separate "deploy" step needed, just commit and
-   push, then check the Actions tab (or ask the account owner to hard-refresh / open the URL
-   fresh, since the service worker caches aggressively).
+   push, then check the Actions tab (or ask the account owner to hard-refresh / fully close and
+   reopen the tab, since the service worker caches aggressively).
 3. **Don't add a framework or CDN dependency** without checking — this is a deliberate
    architectural constraint (see §5), not an oversight.
-4. **The account owner and the invited contact are different people** who may both show up in
-   conversation. Confirm who you're talking to before making account/architecture-level decisions
-   — this bit the previous session (see §4.3) and is worth a quick clarifying question rather than
-   assuming.
-5. Full task-by-task build history: `specs/001-crave-and-care-mvp/tasks.md`. Manual QA walkthrough
-   for all five original stories: `specs/001-crave-and-care-mvp/quickstart.md`.
+4. **Watch for the root-absolute-path bug pattern** (§4) in anything new — it's bitten this
+   project four separate times already.
+5. **Multiple people test this app** (the account owner, plus whoever they've invited — e.g. a
+   partner, a parent). Confirm who you're talking to before making account/architecture-level
+   decisions, and don't assume a phone described in conversation belongs to the account owner.
+6. **Timeline photo sharing with partners is the most likely next ask** (§3, item 1) — it's a
+   real infrastructure addition (Storage bucket, sync, RLS, UI), not a quick fix. Worth sizing
+   and confirming the approach (storage bucket vs. inline, size caps, etc.) with the account
+   owner before building rather than guessing.
+7. Full task-by-task build history: `specs/001-crave-and-care-mvp/tasks.md`. Manual QA walkthrough
+   for all five original stories: `specs/001-crave-and-care-mvp/quickstart.md` (not yet updated
+   for the permission-tier or comfort-sharing changes).

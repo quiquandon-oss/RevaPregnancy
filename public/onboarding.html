@@ -60,6 +60,13 @@
           <label for="onboarding-invite-label">Who's this for? (optional — just so you can tell invites apart)</label>
           <input type="text" id="onboarding-invite-label" placeholder="e.g. Mom, my partner" />
         </div>
+        <div class="field">
+          <label for="onboarding-invite-permission">What can they see?</label>
+          <select id="onboarding-invite-permission">
+            <option value="dispatch_recipient">Craving requests only</option>
+            <option value="full_support_access">Full support access — also mood &amp; energy check-ins</option>
+          </select>
+        </div>
         <button class="btn btn-primary btn-block" id="invite-now">Invite someone now</button>
         <p id="onboarding-invite-error" class="micro" style="color: var(--color-danger)" hidden></p>
         <div id="onboarding-invite-card" class="card stack" hidden>

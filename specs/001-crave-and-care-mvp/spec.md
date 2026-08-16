@@ -144,6 +144,9 @@ permission level, and confirming the inviting user can revoke that access at any
 5. **Given** an invited person has "can receive dispatches" permission, **When** they open their
    own simplified view, **Then** they see only open dispatches assigned to them (not the full
    Crave & Care app).
+6. **Given** an invited person has "full support access" permission, **When** they open their own
+   simplified view, **Then** they see dispatches assigned to them plus the owner's mood/energy
+   check-ins, but still not the full app (no appointments, questions, or profile access).
 
 ---
 
@@ -267,8 +270,10 @@ user lands on the Home screen.
 - **FR-021**: The system MUST let the inviting user view all her support-network members with
   their current permission level, and revoke any member's access at any time, taking effect
   immediately.
-- **FR-022**: The system MUST show an invited support-network member a simplified view limited to
-  the dispatches assigned to her, rather than the full app experience.
+- **FR-022**: The system MUST show an invited support-network member a simplified view limited
+  to her permission level: `dispatch_recipient` sees only the dispatches assigned to her;
+  `full_support_access` additionally sees the owner's mood/energy check-ins. Neither level shows
+  the full app experience (appointments, questions, profile, etc. remain owner-only).
 - **FR-023**: The system MUST simulate/stub the actual delivery of invite links (e.g. via SMS or
   email) for the MVP rather than integrating a live delivery vendor.
 

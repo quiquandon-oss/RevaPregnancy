@@ -146,6 +146,10 @@ export async function updateSupportMember(memberId, changes) {
   return withClient((client) => client.from("support_network_members").update(changes).eq("id", memberId).select().single());
 }
 
+export async function getSupportMember(memberId) {
+  return withClient((client) => client.from("support_network_members").select("*").eq("id", memberId).single());
+}
+
 // ---------------------------------------------------------------------------
 // Comfort entries
 // ---------------------------------------------------------------------------
@@ -165,6 +169,15 @@ export async function getComfortEntry(date) {
 
 export async function listComfortEntries(limit = 30) {
   return withClient((client) => client.from("comfort_entries").select("*").order("date", { ascending: false }).limit(limit));
+}
+
+// For a support-network member with full_support_access reading the owner's mood/energy
+// history — scoped by RLS to accepted, full_support_access members only (see migration
+// 0002_support_member_comfort_access.sql).
+export async function listOwnerComfortEntries(ownerId, limit = 30) {
+  return withClient((client) =>
+    client.from("comfort_entries").select("*").eq("owner_id", ownerId).order("date", { ascending: false }).limit(limit)
+  );
 }
 
 // ---------------------------------------------------------------------------

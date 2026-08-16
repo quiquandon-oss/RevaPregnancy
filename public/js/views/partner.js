@@ -1,8 +1,10 @@
 import { bootPage } from "../app.js";
 import { getCurrentIdentity } from "../identity.js";
-import { acceptInviteAsThisDevice, getThisDeviceMemberRowId } from "../db/support-store.js";
+import { acceptInviteAsThisDevice, getThisDeviceMemberRowId, refreshThisDeviceMember } from "../db/support-store.js";
 import { refreshAssigneeDispatches, getCachedDispatches, updateStatus } from "../db/dispatch-store.js";
 import { CATEGORY_LABELS, statusLabel, isActive, canTransition } from "../models/dispatch.js";
+import { ENERGY_LABELS } from "../models/comfort-entry.js";
+import { listOwnerComfortEntries } from "../api-client.js";
 
 const POLL_INTERVAL_MS = 20000;
 
@@ -54,6 +56,50 @@ async function refresh() {
   renderList(all.filter((d) => d.assignedMemberId === memberRowId));
 }
 
+function renderComfort(entries) {
+  const list = document.getElementById("comfort-list");
+  const empty = document.getElementById("empty-comfort");
+  list.innerHTML = "";
+  empty.hidden = entries.length > 0;
+
+  for (const entry of entries) {
+    const card = document.createElement("div");
+    card.className = "card stack";
+    const energy = entry.energyLevel ? ENERGY_LABELS[entry.energyLevel] || entry.energyLevel : null;
+    const statuses = (entry.statuses || []).map((s) => s.label).join(", ");
+    card.innerHTML = `
+      <div class="row-between">
+        <strong>${entry.date}</strong>
+        ${energy ? `<span class="status-pill">${energy}</span>` : ""}
+      </div>
+      ${statuses ? `<p class="micro">${statuses}</p>` : ""}
+    `;
+    list.appendChild(card);
+  }
+}
+
+// Full_support_access is opt-in per invite (the owner chooses this when creating the
+// invite), so re-checks the member's own record from the server each time rather than
+// trusting a locally-cached permission level — the owner can also change it later.
+async function refreshComfortIfEligible() {
+  const member = await refreshThisDeviceMember();
+  const section = document.getElementById("comfort-section");
+  if (!member || member.status !== "accepted" || member.permissionLevel !== "full_support_access") {
+    section.hidden = true;
+    return;
+  }
+  section.hidden = false;
+  const { data, error } = await listOwnerComfortEntries(member.ownerId);
+  if (!error && data) {
+    renderComfort(data.map((row) => ({ date: row.date, energyLevel: row.energy_level, statuses: row.statuses || [] })));
+  }
+}
+
+async function refreshAll() {
+  await refresh();
+  await refreshComfortIfEligible();
+}
+
 async function handleInviteAcceptance(inviteCode) {
   document.getElementById("accept-section").hidden = false;
   document.getElementById("accept-invite-btn").addEventListener("click", async () => {
@@ -64,7 +110,7 @@ async function handleInviteAcceptance(inviteCode) {
       await acceptInviteAsThisDevice(inviteCode, displayName);
       document.getElementById("accept-section").hidden = true;
       document.getElementById("dispatch-list-section").hidden = false;
-      await refresh();
+      await refreshAll();
     } catch (error) {
       errorEl.textContent = "That invite link doesn't seem to work anymore — worth double-checking with the person who sent it.";
       errorEl.hidden = false;
@@ -85,8 +131,8 @@ async function main() {
   }
 
   document.getElementById("dispatch-list-section").hidden = false;
-  await refresh();
-  window.setInterval(refresh, POLL_INTERVAL_MS);
+  await refreshAll();
+  window.setInterval(refreshAll, POLL_INTERVAL_MS);
 }
 
 main();

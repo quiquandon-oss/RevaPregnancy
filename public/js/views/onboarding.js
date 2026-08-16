@@ -44,8 +44,9 @@ function wireInviteStep() {
     errorEl.hidden = true;
     const labelInput = document.getElementById("onboarding-invite-label");
     const label = labelInput.value.trim() || null;
+    const permissionLevel = document.getElementById("onboarding-invite-permission").value;
     try {
-      const member = await createInvite("dispatch_recipient", label);
+      const member = await createInvite(permissionLevel, label);
       const link = inviteLink(member.inviteCode);
       document.getElementById("onboarding-invite-link").value = link;
       const message = `Here's my Crave & Care invite — no account needed, just tap the link: ${link}`;
