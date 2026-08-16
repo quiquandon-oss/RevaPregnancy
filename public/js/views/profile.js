@@ -1,6 +1,21 @@
 import { bootPage, setMotionPreference, setContrastPreference } from "../app.js";
 import { getProfile, updateProfile } from "../db/profile-store.js";
 import { linkEmail } from "../api-client.js";
+import { listAcceptedSupportMembers } from "../db/support-store.js";
+
+async function populateDefaultFulfiller(profile) {
+  const select = document.getElementById("default-fulfiller");
+  const members = await listAcceptedSupportMembers().catch(() => []);
+  for (const member of members) {
+    const option = document.createElement("option");
+    option.value = member.id;
+    option.textContent = member.displayName || "Support person";
+    select.appendChild(option);
+  }
+  // Falls back to "Just me" if the previously-chosen person was revoked since — the option
+  // simply won't exist anymore, and an unmatched value leaves a <select> on its first option.
+  select.value = profile.defaultFulfillerId || "";
+}
 
 async function loadIntoForm() {
   const profile = await getProfile();
@@ -13,6 +28,7 @@ async function loadIntoForm() {
   document.getElementById("pref-safe-notes").checked = !!profile.pregnancySafeNotesEnabled;
   document.getElementById("pref-reduced-motion").checked = localStorage.getItem("cc.motion") === "reduced";
   document.getElementById("pref-high-contrast").checked = localStorage.getItem("cc.contrast") === "high";
+  await populateDefaultFulfiller(profile);
   renderLinkStatus(profile);
 }
 
@@ -40,6 +56,7 @@ function wireSave() {
         comfortReminders: document.getElementById("pref-comfort-reminders").checked,
       },
       pregnancySafeNotesEnabled: document.getElementById("pref-safe-notes").checked,
+      defaultFulfillerId: document.getElementById("default-fulfiller").value || null,
     });
   });
 

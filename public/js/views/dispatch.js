@@ -38,7 +38,7 @@ function wireIntensitySelector() {
   });
 }
 
-async function populateFulfillerOptions() {
+async function populateFulfillerOptions(defaultFulfillerId) {
   const select = document.getElementById("fulfiller");
   const members = await listAcceptedSupportMembers().catch(() => []);
   for (const member of members) {
@@ -47,6 +47,9 @@ async function populateFulfillerOptions() {
     option.textContent = member.displayName || "Support person";
     select.appendChild(option);
   }
+  // Set from Profile > "Send craving requests to" (defaults to "Just for me" if unset, or if
+  // the previously-chosen person was revoked since — the option simply won't exist anymore).
+  if (defaultFulfillerId) select.value = defaultFulfillerId;
 }
 
 async function populateSuggestions(category) {
@@ -113,7 +116,7 @@ async function initForm(category) {
 
   wireIntensitySelector();
   wireVoiceInput();
-  await populateFulfillerOptions();
+  await populateFulfillerOptions(profile?.defaultFulfillerId);
   await populateSuggestions(category);
 
   document.getElementById("send-dispatch").addEventListener("click", async () => {

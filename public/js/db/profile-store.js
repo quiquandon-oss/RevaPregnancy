@@ -27,6 +27,7 @@ export async function createProfile({ name, dueDate, currentWeek }) {
     notificationPrefs: { dispatchUpdates: true, comfortReminders: true },
     disclaimerAcknowledgedAt: null,
     pregnancySafeNotesEnabled: false,
+    defaultFulfillerId: null, // support_network_members.id, or null for "Just for me"
     linkedEmail: null,
     emailLinkedAt: null,
     createdAt: new Date().toISOString(),
