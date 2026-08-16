@@ -11,7 +11,9 @@ const NAV_ITEMS = [
 ];
 
 const PAGES_WITHOUT_NAV = ["onboarding.html", "partner.html"];
-const PAGES_EXEMPT_FROM_DISCLAIMER_GATE = ["onboarding.html"];
+// partner.html is a support-network member's own view, not the pregnant user's — it has its
+// own invite-based entry flow and never goes through this app's onboarding/disclaimer.
+const PAGES_EXEMPT_FROM_DISCLAIMER_GATE = ["onboarding.html", "partner.html"];
 
 export function currentPage() {
   const path = window.location.pathname.split("/").pop() || "index.html";

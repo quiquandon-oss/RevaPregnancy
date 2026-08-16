@@ -197,7 +197,7 @@ begin
   is_owner := (old.owner_id = auth.uid());
   is_assignee := exists (
     select 1 from public.support_network_members
-    where id = old.assigned_member_id and member_auth_id = auth.uid()
+    where id = old.assigned_member_id and member_auth_id = auth.uid() and status = 'accepted'
   );
 
   if old.status in ('delivered', 'cancelled') then
@@ -246,7 +246,8 @@ create policy dispatches_select
   using (
     owner_id = auth.uid()
     or assigned_member_id in (
-      select id from public.support_network_members where member_auth_id = auth.uid()
+      select id from public.support_network_members
+      where member_auth_id = auth.uid() and status = 'accepted'
     )
   );
 
@@ -259,7 +260,8 @@ create policy dispatches_update
   using (
     owner_id = auth.uid()
     or assigned_member_id in (
-      select id from public.support_network_members where member_auth_id = auth.uid()
+      select id from public.support_network_members
+      where member_auth_id = auth.uid() and status = 'accepted'
     )
   )
   with check (true); -- trigger enforces the transition/role rules

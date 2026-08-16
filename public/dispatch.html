@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dispatch a Craving — Crave & Care</title>
+    <meta name="theme-color" content="#8fae8b" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="css/tokens.css" />
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/components.css" />
+  </head>
+  <body>
+    <main class="app-main stack">
+      <a href="index.html" class="label">&larr; Home</a>
+
+      <!-- New dispatch form -->
+      <section id="dispatch-form-section" class="stack" hidden>
+        <h1 id="form-title">What sounds good?</h1>
+
+        <div class="field">
+          <label for="item-name">What is it? (optional)</label>
+          <input type="text" id="item-name" placeholder="e.g. pickled mango" />
+          <div id="suggestions" class="row" style="flex-wrap: wrap; gap: 8px" aria-label="Recent items"></div>
+          <button type="button" class="icon-btn" id="voice-input-item" aria-label="Use voice input" style="align-self: flex-start">
+            🎙️
+          </button>
+        </div>
+
+        <div class="field">
+          <label for="intensity">How strong is the craving?</label>
+          <div class="segmented" role="group" aria-label="Intensity, 1 to 5" id="intensity-group">
+            <button type="button" class="segmented__option" data-value="1" aria-pressed="false">1</button>
+            <button type="button" class="segmented__option" data-value="2" aria-pressed="false">2</button>
+            <button type="button" class="segmented__option" data-value="3" aria-pressed="true">3</button>
+            <button type="button" class="segmented__option" data-value="4" aria-pressed="false">4</button>
+            <button type="button" class="segmented__option" data-value="5" aria-pressed="false">5</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="fulfiller">Who's this for?</label>
+          <select id="fulfiller">
+            <option value="self">Just for me</option>
+          </select>
+        </div>
+
+        <div id="safe-notes" class="card" hidden>
+          <p class="micro" id="safe-notes-text"></p>
+        </div>
+
+        <button class="btn btn-primary btn-block" id="send-dispatch">Send</button>
+        <p id="form-error" class="micro" style="color: var(--color-danger)" hidden></p>
+      </section>
+
+      <!-- Active dispatch status -->
+      <section id="status-section" class="stack" hidden>
+        <h1>On its way</h1>
+        <div class="card stack">
+          <div class="row-between">
+            <span id="status-category" class="label"></span>
+            <span class="status-pill" id="status-pill">Requested</span>
+          </div>
+          <p id="status-item-name"></p>
+          <ol class="stack" id="status-timeline" style="list-style: none; padding: 0; margin: 0"></ol>
+        </div>
+        <button class="btn btn-outline btn-block" id="cancel-dispatch">Cancel this request</button>
+      </section>
+    </main>
+
+    <script type="module" src="js/views/dispatch.js"></script>
+  </body>
+</html>

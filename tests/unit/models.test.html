@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Model unit tests</title>
+    <style>
+      body { font-family: monospace; padding: 24px; }
+      .pass { color: #2c7a2c; }
+      .fail { color: #b3564f; font-weight: bold; }
+    </style>
+  </head>
+  <body>
+    <h1>Model unit tests</h1>
+    <div id="results"></div>
+
+    <script type="module">
+      import {
+        canTransition,
+        validateDispatchInput,
+        createDispatchDraft,
+        isActive,
+      } from "../../public/js/models/dispatch.js";
+      import { validateComfortStatusInput, upsertStatusInEntry } from "../../public/js/models/comfort-entry.js";
+      import { validateAppointmentInput, deriveNextVisit, readyForVisitSummary } from "../../public/js/models/appointment.js";
+      import { validateQuestionInput } from "../../public/js/models/question.js";
+
+      const results = [];
+      function check(name, fn) {
+        try {
+          fn();
+          results.push({ name, pass: true });
+        } catch (error) {
+          results.push({ name, pass: false, error: error.message });
+        }
+      }
+      function assertEqual(actual, expected, msg) {
+        if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+          throw new Error(`${msg || "assertion failed"}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
+        }
+      }
+      function assertTrue(value, msg) {
+        if (!value) throw new Error(msg || "expected truthy value");
+      }
+
+      // --- dispatch.js ---
+      check("canTransition allows the forward chain", () => {
+        assertTrue(canTransition("requested", "accepted"));
+        assertTrue(canTransition("accepted", "on_the_way"));
+        assertTrue(canTransition("on_the_way", "delivered"));
+      });
+      check("canTransition rejects skipping a step", () => {
+        assertTrue(!canTransition("requested", "on_the_way"));
+        assertTrue(!canTransition("requested", "delivered"));
+      });
+      check("canTransition rejects moving out of a terminal state", () => {
+        assertTrue(!canTransition("delivered", "requested"));
+        assertTrue(!canTransition("cancelled", "requested"));
+      });
+      check("canTransition allows cancelling from requested or accepted", () => {
+        assertTrue(canTransition("requested", "cancelled"));
+        assertTrue(canTransition("accepted", "cancelled"));
+        assertTrue(!canTransition("on_the_way", "cancelled"));
+      });
+      check("validateDispatchInput rejects an unknown category", () => {
+        const errors = validateDispatchInput({ category: "spicy", intensity: 3, fulfiller: "self" });
+        assertTrue(errors.length > 0);
+      });
+      check("validateDispatchInput rejects intensity out of range", () => {
+        const errors = validateDispatchInput({ category: "salty", intensity: 9, fulfiller: "self" });
+        assertTrue(errors.length > 0);
+      });
+      check("validateDispatchInput requires assignedMemberId for support_member", () => {
+        const errors = validateDispatchInput({ category: "salty", intensity: 3, fulfiller: "support_member" });
+        assertTrue(errors.length > 0);
+      });
+      check("validateDispatchInput passes for a valid self dispatch", () => {
+        const errors = validateDispatchInput({ category: "salty", intensity: 3, fulfiller: "self" });
+        assertEqual(errors, []);
+      });
+      check("createDispatchDraft clears assignedMemberId for self", () => {
+        const draft = createDispatchDraft({ category: "salty", intensity: 3, fulfiller: "self", assignedMemberId: "x" });
+        assertEqual(draft.assignedMemberId, null);
+      });
+      check("isActive is false for delivered/cancelled", () => {
+        assertTrue(!isActive({ status: "delivered" }));
+        assertTrue(!isActive({ status: "cancelled" }));
+        assertTrue(isActive({ status: "requested" }));
+      });
+
+      // --- comfort-entry.js ---
+      check("validateComfortStatusInput requires a label", () => {
+        const errors = validateComfortStatusInput({ label: "" });
+        assertTrue(errors.length > 0);
+      });
+      check("upsertStatusInEntry adds a new status", () => {
+        const entry = { date: "2026-08-16", statuses: [] };
+        const updated = upsertStatusInEntry(entry, { label: "Needs Fresh Air", source: "curated" });
+        assertEqual(updated.statuses.length, 1);
+        assertEqual(updated.statuses[0].addressed, false);
+      });
+      check("upsertStatusInEntry toggles addressed on an existing status by id", () => {
+        const entry = { date: "2026-08-16", statuses: [{ id: "s1", label: "Nausea Present", addressed: false }] };
+        const updated = upsertStatusInEntry(entry, { id: "s1", addressed: true });
+        assertEqual(updated.statuses[0].addressed, true);
+        assertEqual(updated.statuses.length, 1);
+      });
+
+      // --- appointment.js ---
+      check("validateAppointmentInput requires title and datetime", () => {
+        const errors = validateAppointmentInput({ title: "", datetime: "" });
+        assertTrue(errors.length >= 2);
+      });
+      check("deriveNextVisit picks the soonest future appointment", () => {
+        const now = new Date("2026-08-16T00:00:00Z");
+        const appointments = [
+          { id: "a", datetime: "2026-08-10T00:00:00Z" }, // past
+          { id: "b", datetime: "2026-09-01T00:00:00Z" },
+          { id: "c", datetime: "2026-08-20T00:00:00Z" }, // soonest future
+        ];
+        const next = deriveNextVisit(appointments, now);
+        assertEqual(next.id, "c");
+      });
+      check("deriveNextVisit returns null when nothing is upcoming", () => {
+        const now = new Date("2026-08-16T00:00:00Z");
+        const next = deriveNextVisit([{ id: "a", datetime: "2026-01-01T00:00:00Z" }], now);
+        assertEqual(next, null);
+      });
+      check("readyForVisitSummary lists unchecked items and unasked questions", () => {
+        const appointment = {
+          checklist: [
+            { id: "1", label: "Bring insurance card", completed: false },
+            { id: "2", label: "Write down weight", completed: true },
+          ],
+        };
+        const questions = [
+          { id: "q1", text: "Is this normal?", asked: false },
+          { id: "q2", text: "Already asked", asked: true },
+        ];
+        const summary = readyForVisitSummary(appointment, questions);
+        assertEqual(summary.checklist.length, 1);
+        assertEqual(summary.questions.length, 1);
+      });
+
+      // --- question.js ---
+      check("validateQuestionInput requires non-empty text", () => {
+        const errors = validateQuestionInput({ text: "  " });
+        assertTrue(errors.length > 0);
+      });
+
+      const container = document.getElementById("results");
+      let failed = 0;
+      for (const r of results) {
+        const div = document.createElement("div");
+        div.className = r.pass ? "pass" : "fail";
+        div.textContent = `${r.pass ? "PASS" : "FAIL"} — ${r.name}${r.error ? ": " + r.error : ""}`;
+        container.appendChild(div);
+        if (!r.pass) failed++;
+      }
+      const summary = document.createElement("p");
+      summary.textContent = `${results.length - failed}/${results.length} passed`;
+      container.prepend(summary);
+      window.__TEST_RESULTS__ = { total: results.length, failed };
+    </script>
+  </body>
+</html>

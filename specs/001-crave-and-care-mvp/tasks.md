@@ -106,41 +106,41 @@ dispatch to "Delivered," confirming the Home banner updates.
 
 ### Implementation for User Story 1
 
-- [ ] T018 [P] [US1] Create `public/js/models/dispatch.js`: factory + validation for category
+- [X] T018 [P] [US1] Create `public/js/models/dispatch.js`: factory + validation for category
       enum, intensity (1-5), fulfiller choice, and a pure state-machine helper
       (`canTransition(from, to)`) mirroring data-model.md
-- [ ] T019 [US1] Add dispatch handling to `public/js/db/local-store.js` (or a co-located
+- [X] T019 [US1] Add dispatch handling to `public/js/db/local-store.js` (or a co-located
       `public/js/db/dispatch-store.js`): cache reads from Supabase and queue offline-created
       dispatches via `sync-queue.js` (depends on T012, T013, T018)
-- [ ] T020 [US1] Implement dispatch create/list/update-status calls in `public/js/api-client.js`
+- [X] T020 [US1] Implement dispatch create/list/update-status calls in `public/js/api-client.js`
       per contracts/api.md, falling back to the offline queue when the network is unavailable
       (depends on T014, T019)
-- [ ] T021 [US1] Build `public/index.html` (Home): greeting, last-dispatch status banner, 2×3
+- [X] T021 [US1] Build `public/index.html` (Home): greeting, last-dispatch status banner, 2×3
       craving category grid (Salty/Sweet/Sour/Cold Drink/Fresh Fruit/Specific Snack), and a
       quick-add custom request affordance, per blueprint screen H-01
-- [ ] T022 [US1] Build `public/dispatch.html` (dispatch form + active status view): category
+- [X] T022 [US1] Build `public/dispatch.html` (dispatch form + active status view): category
       (pre-filled from Home), item name/notes, intensity, fulfiller choice (Self / one
       support-network member), submit and cancel controls, per blueprint screens H-02/H-03
-- [ ] T023 [US1] Implement `public/js/views/home.js`: render the greeting and last-dispatch
+- [X] T023 [US1] Implement `public/js/views/home.js`: render the greeting and last-dispatch
       banner from the local cache, poll for status updates while the page is open, wire category
       grid taps to `dispatch.html`, and render the empty/first-use state copy (depends on T020,
       T021)
-- [ ] T024 [US1] Implement `public/js/views/dispatch.js`: form handling and validation, "recently
+- [X] T024 [US1] Implement `public/js/views/dispatch.js`: form handling and validation, "recently
       used items" suggestions (last 5-10 fulfilled items for the selected category), submit via
       `api-client.js`, cancel action, and status polling for the active dispatch (depends on
       T020, T022)
-- [ ] T025 [US1] Build `public/partner.html`: a simplified view listing only dispatches assigned
+- [X] T025 [US1] Build `public/partner.html`: a simplified view listing only dispatches assigned
       to the caller, with Accept / On the way / Delivered controls, per spec User Story 1 & 4
-- [ ] T026 [US1] Implement `public/js/views/partner.js`: fetch dispatches with `role=assignee`,
+- [X] T026 [US1] Implement `public/js/views/partner.js`: fetch dispatches with `role=assignee`,
       wire the status-advance controls to `api-client.js`, and poll for new assignments (depends
       on T020, T025)
-- [ ] T027 [US1] Add the optional "pregnancy-safe notes" toggle behavior to
+- [X] T027 [US1] Add the optional "pregnancy-safe notes" toggle behavior to
       `public/js/views/dispatch.js`: off by default, and when enabled shows a short non-blocking
       note without ever preventing submission (FR-008)
-- [ ] T028 [P] [US1] Write `supabase/tests/rls-and-transitions.test.js`: `node --test` cases
+- [X] T028 [P] [US1] Write `supabase/tests/rls-and-transitions.test.js`: `node --test` cases
       against a local Supabase instance verifying (a) an owner/assignee can only see their own
       dispatches, (b) the status trigger rejects invalid transitions (depends on T006-T011)
-- [ ] T029 [P] [US1] Write `tests/unit/models.test.html`: a hand-rolled assertion page covering
+- [X] T029 [P] [US1] Write `tests/unit/models.test.html`: a hand-rolled assertion page covering
       `dispatch.js`'s validation and `canTransition` helper (depends on T018)
 
 **Checkpoint**: User Story 1 is fully functional and independently testable/demoable (self-dispatch
@@ -161,7 +161,7 @@ entry appears in Supabase once back online.
 
 ### Implementation for User Story 2
 
-- [ ] T030 [P] [US2] Create `public/js/models/comfort-entry.js`: factory + validation for
+- [X] T030 [P] [US2] Create `public/js/models/comfort-entry.js`: factory + validation for
       `DailyComfortEntry` and embedded `ComfortStatusEntry` per data-model.md
 - [ ] T031 [US2] Add `DailyComfortEntry` handling (upsert-by-date local cache + offline queue) to
       `local-store.js` / `sync-queue.js`, following the same pattern as dispatch handling in
@@ -198,9 +198,9 @@ items, capture a question, confirm the "ready for your visit" summary.
 
 ### Implementation for User Story 3
 
-- [ ] T038 [P] [US3] Create `public/js/models/appointment.js`: factory + validation for
+- [X] T038 [P] [US3] Create `public/js/models/appointment.js`: factory + validation for
       `Appointment` and embedded `ChecklistItem` per data-model.md
-- [ ] T039 [P] [US3] Create `public/js/models/question.js`: factory + validation for `Question`
+- [X] T039 [P] [US3] Create `public/js/models/question.js`: factory + validation for `Question`
 - [ ] T040 [US3] Add `Appointment` and `Question` handling to `local-store.js` (purely local, no
       sync-queue involvement) (depends on T012, T038, T039)
 - [ ] T041 [US3] Build `public/care.html` (Appointment Ledger): Next Visit countdown card with

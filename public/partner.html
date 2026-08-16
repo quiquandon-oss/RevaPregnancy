@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Crave & Care — For You</title>
+    <meta name="theme-color" content="#8fae8b" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="css/tokens.css" />
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/components.css" />
+  </head>
+  <body>
+    <main class="app-main stack">
+      <!-- Shown only the first time, when arriving via an invite link not yet accepted -->
+      <section id="accept-section" class="stack" hidden>
+        <h1>You've been invited</h1>
+        <p>Someone would like your help with cravings, when you're able.</p>
+        <div class="field">
+          <label for="display-name">Your name (optional)</label>
+          <input type="text" id="display-name" placeholder="e.g. Sam" />
+        </div>
+        <button class="btn btn-primary btn-block" id="accept-invite-btn">Join</button>
+        <p id="accept-error" class="micro" style="color: var(--color-danger)" hidden></p>
+      </section>
+
+      <!-- The simplified dispatch list for an accepted member -->
+      <section id="dispatch-list-section" class="stack" hidden>
+        <h1>Requests for you</h1>
+        <p id="empty-list" class="micro" hidden>Nothing waiting right now. When you're free, here's where it'll be.</p>
+        <div class="stack" id="dispatch-list"></div>
+      </section>
+    </main>
+
+    <script type="module" src="js/views/partner.js"></script>
+  </body>
+</html>

@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Crave & Care</title>
+    <meta name="theme-color" content="#8fae8b" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="css/tokens.css" />
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/components.css" />
+  </head>
+  <body>
+    <main class="app-main stack" id="home-main">
+      <header class="row-between">
+        <div>
+          <p class="label" id="greeting-eyebrow">Good day</p>
+          <h1 id="greeting-name">Hello</h1>
+        </div>
+        <a class="icon-btn" href="profile.html" aria-label="Profile and settings">👤</a>
+      </header>
+
+      <a class="status-banner" id="last-dispatch-banner" href="dispatch.html" hidden>
+        <span class="status-banner__icon" aria-hidden="true">🚚</span>
+        <span class="stack" style="gap: 2px">
+          <span id="last-dispatch-text">Last dispatch</span>
+          <span class="status-pill" id="last-dispatch-status">Requested</span>
+        </span>
+      </a>
+
+      <section id="empty-state" class="card" hidden>
+        <p>Whenever a craving appears, we're here.</p>
+      </section>
+
+      <section>
+        <h2>Instant Craving Dispatch</h2>
+        <div class="category-grid" id="category-grid">
+          <button class="category-card" data-category="salty">
+            <span class="category-icon" aria-hidden="true">🍟</span>
+            <span>Salty</span>
+          </button>
+          <button class="category-card" data-category="sweet">
+            <span class="category-icon" aria-hidden="true">🍦</span>
+            <span>Sweet</span>
+          </button>
+          <button class="category-card" data-category="sour">
+            <span class="category-icon" aria-hidden="true">🍋</span>
+            <span>Sour</span>
+          </button>
+          <button class="category-card" data-category="cold_drink">
+            <span class="category-icon" aria-hidden="true">🥤</span>
+            <span>Cold Drink</span>
+          </button>
+          <button class="category-card" data-category="fresh_fruit">
+            <span class="category-icon" aria-hidden="true">🍎</span>
+            <span>Fresh Fruit</span>
+          </button>
+          <button class="category-card" data-category="specific_snack">
+            <span class="category-icon" aria-hidden="true">🔍</span>
+            <span>Specific Snack</span>
+          </button>
+        </div>
+      </section>
+
+      <button class="btn btn-outline btn-block" id="quick-add-custom">
+        + Quick-add a custom request
+      </button>
+    </main>
+
+    <script type="module" src="js/views/home.js"></script>
+  </body>
+</html>
