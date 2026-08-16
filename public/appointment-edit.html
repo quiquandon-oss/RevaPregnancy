@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Appointment — Crave & Care</title>
+    <meta name="theme-color" content="#8fae8b" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="css/tokens.css" />
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/components.css" />
+  </head>
+  <body>
+    <main class="app-main stack">
+      <a href="care.html" class="label">&larr; Appointment Ledger</a>
+      <h1 id="page-title">New Appointment</h1>
+
+      <div class="field">
+        <label for="title">Title</label>
+        <input type="text" id="title" placeholder="e.g. 20-week ultrasound" />
+      </div>
+
+      <div class="field">
+        <label for="type">Type</label>
+        <input type="text" id="type" placeholder="e.g. OB-GYN checkup" />
+      </div>
+
+      <div class="field">
+        <label for="datetime">Date &amp; time</label>
+        <input type="datetime-local" id="datetime" />
+      </div>
+
+      <div class="field">
+        <label for="location">Location (optional)</label>
+        <input type="text" id="location" placeholder="e.g. Riverside Clinic" />
+      </div>
+
+      <div class="field">
+        <label>Prep checklist</label>
+        <div class="stack" id="checklist-items"></div>
+        <div class="row">
+          <input type="text" id="new-checklist-item" placeholder="Add a checklist item" />
+          <button class="btn btn-outline" id="add-checklist-item">Add</button>
+        </div>
+      </div>
+
+      <button class="btn btn-primary btn-block" id="save-appointment">Save</button>
+      <button class="btn btn-danger btn-block" id="delete-appointment" hidden>Remove this appointment</button>
+      <p id="form-error" class="micro" style="color: var(--color-danger)" hidden></p>
+    </main>
+
+    <script type="module" src="js/views/appointment-edit.js"></script>
+  </body>
+</html>

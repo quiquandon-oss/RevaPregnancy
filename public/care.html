@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Care — Crave & Care</title>
+    <meta name="theme-color" content="#8fae8b" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="css/tokens.css" />
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/components.css" />
+  </head>
+  <body>
+    <main class="app-main stack">
+      <div class="row-between">
+        <h1>Appointment Ledger</h1>
+        <a class="btn btn-primary" href="appointment-edit.html">+ New</a>
+      </div>
+
+      <section id="next-visit-section" class="card card--accent-purple stack" hidden>
+        <span class="label">Next Visit</span>
+        <h2 id="next-visit-days"></h2>
+        <p id="next-visit-details"></p>
+        <div>
+          <h3>Prep checklist</h3>
+          <div id="next-visit-checklist" class="stack"></div>
+        </div>
+        <div id="ready-summary" class="micro"></div>
+        <a id="edit-next-visit" class="btn btn-outline btn-block">Edit this appointment</a>
+      </section>
+
+      <section id="no-appointments" class="card" hidden>
+        <p>No appointments yet. When you have one coming up, add it here.</p>
+      </section>
+
+      <section>
+        <h2>All appointments</h2>
+        <div class="stack" id="appointment-list"></div>
+      </section>
+
+      <section>
+        <h2>On-the-Fly Questions</h2>
+        <div class="field">
+          <label for="new-question">Something you want to remember to ask?</label>
+          <div class="row">
+            <input type="text" id="new-question" placeholder="Type your question" />
+            <button class="icon-btn" id="voice-input-question" aria-label="Use voice input">🎙️</button>
+          </div>
+          <button class="btn btn-outline" id="add-question">Add question</button>
+        </div>
+        <div class="stack" id="question-list"></div>
+      </section>
+    </main>
+
+    <script type="module" src="js/views/care.js"></script>
+  </body>
+</html>

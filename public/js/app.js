@@ -94,6 +94,11 @@ export async function bootPage({ skipDisclaimerGate = false } = {}) {
   renderBottomNav();
   registerServiceWorker();
   watchAuthState();
-  await ensureSession();
+  // The disclaimer gate only reads local storage, so it resolves immediately; a page's own
+  // interactivity (button wiring, etc.) must never wait on the network. ensureSession() is
+  // deliberately NOT awaited here — it resolves in the background, and anything that actually
+  // needs the resulting identity (getCurrentIdentity(), in identity.js) awaits it lazily at the
+  // point of use instead, per constitution Principle V (offline-first).
   if (!skipDisclaimerGate) await enforceDisclaimerGate();
+  ensureSession();
 }

@@ -201,18 +201,18 @@ items, capture a question, confirm the "ready for your visit" summary.
 - [X] T038 [P] [US3] Create `public/js/models/appointment.js`: factory + validation for
       `Appointment` and embedded `ChecklistItem` per data-model.md
 - [X] T039 [P] [US3] Create `public/js/models/question.js`: factory + validation for `Question`
-- [ ] T040 [US3] Add `Appointment` and `Question` handling to `local-store.js` (purely local, no
+- [X] T040 [US3] Add `Appointment` and `Question` handling to `local-store.js` (purely local, no
       sync-queue involvement) (depends on T012, T038, T039)
-- [ ] T041 [US3] Build `public/care.html` (Appointment Ledger): Next Visit countdown card with
+- [X] T041 [US3] Build `public/care.html` (Appointment Ledger): Next Visit countdown card with
       its checklist, question-capture entry point, and "ready for your visit" summary, per
       blueprint screen A-01
-- [ ] T042 [US3] Build `public/appointment-edit.html` (Add/Edit Appointment): title, type,
+- [X] T042 [US3] Build `public/appointment-edit.html` (Add/Edit Appointment): title, type,
       date/time, location, checklist editing, per blueprint screen A-02
-- [ ] T043 [US3] Implement `public/js/views/care.js`: derive "Next Visit" as the soonest future
+- [X] T043 [US3] Implement `public/js/views/care.js`: derive "Next Visit" as the soonest future
       appointment, render its countdown and checklist, capture/list questions independent of any
       one appointment, and compute the "ready for your visit" summary (unchecked items + unasked
       questions) per FR-018 (depends on T040, T041, T042)
-- [ ] T044 [US3] Extend `tests/unit/models.test.html` with assertions for the Next-Visit
+- [X] T044 [US3] Extend `tests/unit/models.test.html` with assertions for the Next-Visit
       derivation and "ready for your visit" summary logic (depends on T029, T043)
 
 **Checkpoint**: User Stories 1, 2, and 3 all work independently.
