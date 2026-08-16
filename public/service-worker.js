@@ -3,7 +3,7 @@
 // app shell works offline from the very first launch, not just pages visited so far; anything
 // not listed here (e.g. a future page) still gets covered at runtime via stale-while-revalidate.
 
-const CACHE_NAME = "crave-and-care-v11";
+const CACHE_NAME = "crave-and-care-v12";
 
 const CORE_ASSETS = [
   // Pages
@@ -16,6 +16,7 @@ const CORE_ASSETS = [
   "profile.html",
   "support-network.html",
   "partner.html",
+  "partner-timeline.html",
   "onboarding.html",
   "manifest.webmanifest",
   "partner-manifest.webmanifest",
@@ -38,6 +39,9 @@ const CORE_ASSETS = [
   "js/data/comfort-statuses.js",
   // Lib
   "js/lib/image-compress.js",
+  "js/lib/chat.js",
+  "js/lib/push.js",
+  "js/partner-shared.js",
   // Models
   "js/models/dispatch.js",
   "js/models/comfort-entry.js",
@@ -55,6 +59,7 @@ const CORE_ASSETS = [
   "js/views/profile.js",
   "js/views/support-network.js",
   "js/views/partner.js",
+  "js/views/partner-timeline.js",
   "js/views/onboarding.js",
 ];
 
@@ -94,6 +99,38 @@ self.addEventListener("fetch", (event) => {
   if (url.pathname.startsWith("/supabase") ) return;
 
   event.respondWith(staleWhileRevalidate(request));
+});
+
+// Web Push: the push service wakes this worker up even if no tab is open. Payload comes from
+// send-push's `JSON.stringify({ title, body, url })` (see supabase/functions/send-push).
+self.addEventListener("push", (event) => {
+  let payload = { title: "Crave & Care", body: "You have an update.", url: "./" };
+  try {
+    if (event.data) payload = { ...payload, ...event.data.json() };
+  } catch {
+    // Non-JSON push payload — fall back to the defaults above rather than failing silently.
+  }
+  event.waitUntil(
+    self.registration.showNotification(payload.title, {
+      body: payload.body,
+      icon: "icons/icon-192.svg",
+      badge: "icons/icon-192.svg",
+      data: { url: payload.url || "./" },
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const targetUrl = event.notification.data?.url || "./";
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientsList) => {
+      for (const client of clientsList) {
+        if (client.url.includes(targetUrl) && "focus" in client) return client.focus();
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(targetUrl);
+    })
+  );
 });
 
 async function staleWhileRevalidate(request) {

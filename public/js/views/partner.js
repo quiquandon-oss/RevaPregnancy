@@ -4,10 +4,16 @@ import { acceptInviteAsThisDevice, getThisDeviceMemberRowId, getThisDeviceMember
 import { refreshAssigneeDispatches, getCachedDispatches, updateStatus } from "../db/dispatch-store.js";
 import { CATEGORY_LABELS, statusLabel, isActive, canTransition } from "../models/dispatch.js";
 import { ENERGY_LABELS } from "../models/comfort-entry.js";
-import { CATEGORY_ICONS as MEMORY_ICONS } from "../models/memory.js";
-import { listOwnerComfortEntries, listOwnerMemories, getMemoryPhotoSignedUrl } from "../api-client.js";
+import { listOwnerComfortEntries, markDispatchViewed } from "../api-client.js";
+import { mountChat } from "../lib/chat.js";
+import { isPushSupported, enablePush, getExistingSubscription } from "../lib/push.js";
+import { renderPartnerNav } from "../partner-shared.js";
 
 const POLL_INTERVAL_MS = 20000;
+
+let selectedDispatchId = null;
+let chatUnsubscribe = null;
+let currentOwnerId = null;
 
 function nextAction(status) {
   if (canTransition(status, "accepted")) return { next: "accepted", label: "Accept" };
@@ -16,6 +22,44 @@ function nextAction(status) {
   return null;
 }
 
+async function openChat(dispatch) {
+  if (selectedDispatchId === dispatch.id) return; // already open, nothing to do
+
+  if (chatUnsubscribe) {
+    chatUnsubscribe();
+    chatUnsubscribe = null;
+  }
+  selectedDispatchId = dispatch.id;
+
+  const panel = document.getElementById("chat-panel");
+  panel.hidden = false;
+  document.getElementById("chat-panel-title").textContent =
+    dispatch.itemName || CATEGORY_LABELS[dispatch.category] || "Messages";
+
+  chatUnsubscribe = await mountChat({
+    container: document.getElementById("chat-panel-container"),
+    dispatchId: dispatch.id,
+    myRole: "member",
+  });
+
+  try {
+    await markDispatchViewed(dispatch.id);
+  } catch {
+    // Best-effort — the owner just won't see a "Seen" mark yet; not worth failing the chat over.
+  }
+}
+
+function closeChat() {
+  selectedDispatchId = null;
+  if (chatUnsubscribe) {
+    chatUnsubscribe();
+    chatUnsubscribe = null;
+  }
+  document.getElementById("chat-panel").hidden = true;
+}
+
+// Deliberately does NOT touch #chat-panel — it lives outside this function's DOM entirely so
+// a poll-driven refresh can never interrupt someone mid-conversation (see partner.html).
 function renderList(dispatches) {
   const list = document.getElementById("dispatch-list");
   const empty = document.getElementById("empty-list");
@@ -45,6 +89,12 @@ function renderList(dispatches) {
       });
       card.appendChild(btn);
     }
+    const chatBtn = document.createElement("button");
+    chatBtn.className = "btn btn-outline btn-block";
+    chatBtn.textContent = "💬 Messages";
+    chatBtn.addEventListener("click", () => openChat(dispatch));
+    card.appendChild(chatBtn);
+
     list.appendChild(card);
   }
 }
@@ -95,62 +145,36 @@ async function refreshComfortIfEligible(member) {
   }
 }
 
-function renderTimeline(entries) {
-  const list = document.getElementById("timeline-list");
-  const empty = document.getElementById("empty-timeline");
-  list.innerHTML = "";
-  empty.hidden = entries.length > 0;
-
-  for (const entry of entries) {
-    const article = document.createElement("article");
-    article.className = "timeline-entry";
-    article.innerHTML = `
-      <div class="timeline-entry__marker">
-        <div class="timeline-entry__icon" aria-hidden="true">${MEMORY_ICONS[entry.category] || "💛"}</div>
-        <span class="micro">${entry.date}</span>
-      </div>
-      <div class="timeline-entry__body card">
-        <h3 style="margin-bottom: 4px">${entry.title}</h3>
-        ${entry.note ? `<p class="micro">${entry.note}</p>` : ""}
-        ${entry.photoUrl ? `<div class="timeline-entry__photo"><img src="${entry.photoUrl}" alt="${entry.title}" /></div>` : ""}
-      </div>
-    `;
-    list.appendChild(article);
-  }
-}
-
-// Photos live in a private Storage bucket, so each one needs its own short-lived signed URL —
-// fetched fresh on every refresh rather than cached, since this poll interval (20s) is already
-// long enough that a cached URL nearing expiry isn't worth the extra bookkeeping.
-async function refreshTimelineIfEligible(member) {
-  const section = document.getElementById("timeline-section");
-  if (!member) {
-    section.hidden = true;
+async function refreshPushPrompt() {
+  const prompt = document.getElementById("push-prompt");
+  if (!isPushSupported()) {
+    prompt.hidden = true;
     return;
   }
-  section.hidden = false;
-  const { data, error } = await listOwnerMemories(member.ownerId);
-  if (error || !data) return;
+  const existing = await getExistingSubscription();
+  prompt.hidden = !!existing;
+}
 
-  const entries = await Promise.all(
-    data.map(async (row) => {
-      let photoUrl = null;
-      if (row.photo_path) {
-        const { data: signed } = await getMemoryPhotoSignedUrl(row.photo_path);
-        photoUrl = signed?.signedUrl || null;
-      }
-      return { date: row.date, title: row.title, category: row.category, note: row.note, photoUrl };
-    })
-  );
-  renderTimeline(entries);
+function wirePushPrompt() {
+  document.getElementById("enable-push-btn").addEventListener("click", async () => {
+    if (!currentOwnerId) return;
+    const result = await enablePush(currentOwnerId);
+    if (result.ok) {
+      document.getElementById("push-prompt").hidden = true;
+    }
+    // A denial or failure just leaves the prompt showing — no error text needed here; the
+    // person can simply try again, or the browser's own permission UI already told them why.
+  });
 }
 
 async function refreshAll() {
   await refresh();
   const member = await refreshThisDeviceMember();
+  currentOwnerId = member?.ownerId || currentOwnerId;
   const eligible = member && member.status === "accepted" && member.permissionLevel === "full_support_access" ? member : null;
   await refreshComfortIfEligible(eligible);
-  await refreshTimelineIfEligible(eligible);
+  await refreshPushPrompt();
+  renderPartnerNav("partner.html", !!eligible);
 }
 
 async function handleInviteAcceptance(inviteCode) {
@@ -175,6 +199,9 @@ async function main() {
   await bootPage({ skipDisclaimerGate: true });
   await getCurrentIdentity(); // ensures an anonymous session exists for a brand-new device
 
+  wirePushPrompt();
+  document.getElementById("chat-panel-close").addEventListener("click", closeChat);
+
   const inviteCode = new URLSearchParams(window.location.search).get("invite");
   const existingMember = await getThisDeviceMember();
 
@@ -191,7 +218,8 @@ async function main() {
 
   document.getElementById("dispatch-list-section").hidden = false;
   await refreshAll();
-  window.setInterval(refreshAll, POLL_INTERVAL_MS);
+  window.setInterval(refresh, POLL_INTERVAL_MS);
+  window.setInterval(refreshAll, POLL_INTERVAL_MS * 3); // comfort/nav/push-prompt change less often
 }
 
 main();

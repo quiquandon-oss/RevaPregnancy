@@ -11,6 +11,7 @@ import {
 } from "../db/dispatch-store.js";
 import { CATEGORY_LABELS, statusLabel, isActive } from "../models/dispatch.js";
 import { listAcceptedSupportMembers } from "../db/support-store.js";
+import { mountChat } from "../lib/chat.js";
 
 const PREGNANCY_SAFE_NOTES = {
   soft_cheese: "Soft cheeses: pasteurised is the gentler choice.",
@@ -159,6 +160,8 @@ function renderTimeline(dispatch) {
   }
 }
 
+let chatUnsubscribe = null;
+
 async function refreshStatusView(dispatchId) {
   const all = await getCachedDispatches();
   const dispatch = all.find((d) => d.id === dispatchId);
@@ -168,6 +171,21 @@ async function refreshStatusView(dispatchId) {
   document.getElementById("status-pill").textContent = statusLabel(dispatch.status);
   renderTimeline(dispatch);
   document.getElementById("cancel-dispatch").hidden = !isActive(dispatch) || dispatch.fulfiller === "self";
+
+  const seenEl = document.getElementById("status-seen");
+  seenEl.hidden = !dispatch.memberViewedAt;
+  if (dispatch.memberViewedAt) seenEl.textContent = "Seen";
+
+  const chatSection = document.getElementById("chat-section");
+  if (dispatch.fulfiller === "support_member" && chatSection.hidden) {
+    chatSection.hidden = false;
+    chatUnsubscribe = await mountChat({
+      container: document.getElementById("chat-container"),
+      dispatchId: dispatch.id,
+      myRole: "owner",
+    });
+  }
+
   return dispatch;
 }
 
@@ -179,12 +197,16 @@ async function initStatus(dispatchId) {
   const poll = window.setInterval(async () => {
     await refreshOwnerDispatches(ownerId);
     dispatch = await refreshStatusView(dispatchId);
-    if (dispatch && !isActive(dispatch)) window.clearInterval(poll);
   }, 20000);
 
   document.getElementById("cancel-dispatch").addEventListener("click", async () => {
     await updateStatus(dispatchId, "cancelled");
     await refreshStatusView(dispatchId);
+  });
+
+  window.addEventListener("beforeunload", () => {
+    window.clearInterval(poll);
+    if (chatUnsubscribe) chatUnsubscribe();
   });
 }
 

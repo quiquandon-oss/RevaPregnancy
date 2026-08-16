@@ -33,6 +33,7 @@ function fromApiRow(row) {
     status: row.status,
     requestedAt: row.requested_at,
     statusUpdatedAt: row.status_updated_at,
+    memberViewedAt: row.member_viewed_at,
     pending: false,
   };
 }

@@ -18,7 +18,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_JsU8RCkahoM0FS9bQ9clTQ_VpEGmC7u";
 
 let clientPromise = null;
 
-function getClient() {
+export function getClient() {
   if (!clientPromise) {
     clientPromise = import("https://esm.sh/@supabase/supabase-js@2")
       .then(({ createClient }) => createClient(SUPABASE_URL, SUPABASE_ANON_KEY))
@@ -227,6 +227,87 @@ export async function getMemoryPhotoSignedUrl(path, expiresIn = 3600) {
 
 export async function deleteMemoryPhoto(path) {
   return withClient((client) => client.storage.from("memories").remove([path]));
+}
+
+// A full_support_access support-network member adding a memory on the owner's behalf — see
+// create_memory_as_support_member() in 0005_chat_and_push_notifications.sql. Regular direct
+// inserts (createMemoryRecord above) only work for the owner themselves.
+export async function createMemoryAsSupportMember({ ownerId, title, date, category, note, photoPath }) {
+  return withClient((client) =>
+    client.rpc("create_memory_as_support_member", {
+      p_owner_id: ownerId,
+      p_title: title,
+      p_date: date,
+      p_category: category,
+      p_note: note,
+      p_photo_path: photoPath,
+    })
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Per-dispatch chat + read receipts
+// ---------------------------------------------------------------------------
+
+export async function listDispatchMessages(dispatchId) {
+  return withClient((client) =>
+    client.from("dispatch_messages").select("*").eq("dispatch_id", dispatchId).order("created_at", { ascending: true })
+  );
+}
+
+export async function sendDispatchMessage(dispatchId, body) {
+  return withClient((client) => client.from("dispatch_messages").insert({ dispatch_id: dispatchId, body }).select().single());
+}
+
+export async function markMessageRead(messageId) {
+  return withClient((client) => client.from("dispatch_messages").update({}).eq("id", messageId).select().single());
+}
+
+// Subscribes to new/changed messages on one dispatch in real time (Postgres changes via
+// Supabase Realtime), rather than the 20s polling used elsewhere — a chat feels wrong on a
+// 20-second delay. Returns an unsubscribe function; caller must call it if the caller may be
+// re-invoked (e.g. re-opening the same dispatch), to avoid stacking duplicate subscriptions.
+export async function subscribeToDispatchMessages(dispatchId, onChange) {
+  let client;
+  try {
+    client = await getClient();
+  } catch {
+    return () => {};
+  }
+  const channel = client
+    .channel(`dispatch-messages-${dispatchId}`)
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "dispatch_messages", filter: `dispatch_id=eq.${dispatchId}` },
+      onChange
+    )
+    .subscribe();
+  return () => client.removeChannel(channel);
+}
+
+export async function markDispatchViewed(dispatchId) {
+  return withClient((client) => client.rpc("mark_dispatch_viewed", { p_dispatch_id: dispatchId }));
+}
+
+// ---------------------------------------------------------------------------
+// Push notifications (Web Push)
+// ---------------------------------------------------------------------------
+
+export const VAPID_PUBLIC_KEY =
+  "BBQti0gRRvMx9OVorDTUBAsYz3uwGBdVh7zuCzNDqG7V2oQVXhogCSZwBadpuEREeJsChFrZUZteLMhS0RrMpYw";
+
+export async function savePushSubscription({ ownerId, endpoint, p256dh, authKey }) {
+  return withClient((client) =>
+    client
+      .from("push_subscriptions")
+      .upsert({ owner_id: ownerId, endpoint, p256dh, auth_key: authKey }, { onConflict: "endpoint" })
+      .select()
+      .single()
+  );
+}
+
+export async function deletePushSubscription(endpoint) {
+  return withClient((client) => client.from("push_subscriptions").delete().eq("endpoint", endpoint));
 }
 
 // ---------------------------------------------------------------------------

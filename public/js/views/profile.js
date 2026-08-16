@@ -2,6 +2,8 @@ import { bootPage, setMotionPreference, setContrastPreference } from "../app.js"
 import { getProfile, updateProfile } from "../db/profile-store.js";
 import { linkEmail } from "../api-client.js";
 import { listAcceptedSupportMembers } from "../db/support-store.js";
+import { getCurrentIdentity } from "../identity.js";
+import { isPushSupported, enablePush, getExistingSubscription } from "../lib/push.js";
 
 async function populateDefaultFulfiller(profile) {
   const select = document.getElementById("default-fulfiller");
@@ -94,11 +96,36 @@ function wireEmailLink() {
   });
 }
 
+async function refreshPushUi() {
+  const prompt = document.getElementById("push-prompt");
+  const enabledNotice = document.getElementById("push-enabled-notice");
+  if (!isPushSupported()) {
+    prompt.hidden = true;
+    enabledNotice.hidden = true;
+    return;
+  }
+  const existing = await getExistingSubscription();
+  prompt.hidden = !!existing;
+  enabledNotice.hidden = !existing;
+}
+
+function wirePushToggle() {
+  document.getElementById("enable-push-btn").addEventListener("click", async () => {
+    const { ownerId } = await getCurrentIdentity();
+    const result = await enablePush(ownerId);
+    if (result.ok) await refreshPushUi();
+    // A denial/failure just leaves the prompt showing; the browser's own permission UI
+    // already explains why if the person said no.
+  });
+}
+
 async function main() {
   await bootPage();
   await loadIntoForm();
   wireSave();
   wireEmailLink();
+  wirePushToggle();
+  await refreshPushUi();
 }
 
 main();

@@ -63,9 +63,15 @@
             <span class="status-pill" id="status-pill">Requested</span>
           </div>
           <p id="status-item-name"></p>
+          <p id="status-seen" class="micro" hidden></p>
           <ol class="stack" id="status-timeline" style="list-style: none; padding: 0; margin: 0"></ol>
         </div>
         <button class="btn btn-outline btn-block" id="cancel-dispatch">Cancel this request</button>
+
+        <div id="chat-section" class="card stack" hidden>
+          <h2>Messages</h2>
+          <div id="chat-container"></div>
+        </div>
       </section>
     </main>
 

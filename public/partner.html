@@ -25,6 +25,11 @@
         <p id="accept-error" class="micro" style="color: var(--color-danger)" hidden></p>
       </section>
 
+      <div id="push-prompt" class="card stack" hidden>
+        <p class="micro">Get notified the moment a new request comes in, or a reply arrives.</p>
+        <button class="btn btn-outline btn-block" id="enable-push-btn">Enable notifications</button>
+      </div>
+
       <!-- The simplified dispatch list for an accepted member -->
       <section id="dispatch-list-section" class="stack" hidden>
         <h1>Requests for you</h1>
@@ -32,18 +37,22 @@
         <div class="stack" id="dispatch-list"></div>
       </section>
 
+      <!-- Lives outside dispatch-list-section deliberately: the list above rebuilds on every
+           20s poll, but this shouldn't — reopening it mid-render would wipe out a draft
+           message someone's mid-typing. -->
+      <div id="chat-panel" class="card stack" hidden>
+        <div class="row-between">
+          <h2 id="chat-panel-title" style="margin: 0">Messages</h2>
+          <button type="button" class="icon-btn" id="chat-panel-close" aria-label="Close chat">✕</button>
+        </div>
+        <div id="chat-panel-container"></div>
+      </div>
+
       <!-- Shown only for full_support_access members, once accepted -->
       <section id="comfort-section" class="stack" hidden>
         <h1>Recent mood &amp; energy</h1>
         <p id="empty-comfort" class="micro" hidden>No check-ins yet.</p>
         <div class="stack" id="comfort-list"></div>
-      </section>
-
-      <!-- Shown only for full_support_access members, once accepted -->
-      <section id="timeline-section" class="stack" hidden>
-        <h1>Timeline</h1>
-        <p id="empty-timeline" class="micro" hidden>No memories shared yet.</p>
-        <div class="timeline stack" id="timeline-list"></div>
       </section>
     </main>
 

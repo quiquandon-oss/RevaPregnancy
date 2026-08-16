@@ -25,13 +25,22 @@ pregnant person or the people she invites to help. Six core features:
    - `full_support_access`: also sees the owner's mood/energy check-ins **and Timeline**
      (photos, ultrasounds, milestones).
    Neither level shows the full app — appointments, questions, and profile stay owner-only
-   regardless of permission level.
+   regardless of permission level. A member's own view is a genuine two-tab mini-app
+   (`partner.html` = Requests, `partner-timeline.html` = Timeline — only shown to
+   `full_support_access` members), with its own nav (`js/partner-shared.js`), not the owner's.
 5. **Onboarding & Profile** — name/due date, disclaimer, optional email-based account linking for
    cross-device resume.
 6. **Full Journey Timeline** — a photo/ultrasound/milestone journal. Synced (compressed photos in
    Supabase Storage + metadata in Postgres) so it survives device loss, resumes on a second
    device, and is visible to `full_support_access` partners. Full-quality originals still stay
-   on the device that took them; only the synced copy is compressed (see §5).
+   on the device that took them; only the synced copy is compressed (see §5). A
+   `full_support_access` member can also **add** memories (with their own photo upload) via
+   `partner-timeline.html` — not just view the owner's.
+7. **Chat + push notifications, per dispatch.** Real-time (Supabase Realtime, not polling)
+   two-way messaging attached to each craving request, with read receipts and a "Seen"
+   indicator on the request itself. Backed by real Web Push (VAPID) — a Supabase Edge Function
+   (`send-push`) triggered by a Postgres webhook sends actual OS-level notifications to
+   whichever side didn't cause the event. See §5 for the full pipeline.
 
 Plus: **WhatsApp invite sharing** — one-tap "Send via WhatsApp" button next to the invite link,
 and an optional label on each invite ("Who's this for?") so multiple pending invites are
@@ -75,26 +84,67 @@ if this project gets a "real" Spec Kit pass again rather than incremental chat-d
 
 ## 3. Known issues / open items
 
-1. **No real push notifications exist.** "Notification preferences" on the Profile screen
-   (`dispatchUpdates` / `comfortReminders`) is currently just a toggle with nothing behind it — no
-   `Notification.requestPermission()`, no service worker push handler, no delivery mechanism.
-   Someone asked about this expecting a phone alert on a new dispatch; that doesn't exist yet.
-2. **Deleting a synced memory is best-effort, not queued.** If you delete a Timeline entry while
+1. **Push notifications are real now, but untested end-to-end from a human's actual phone.**
+   The full pipeline (VAPID + service worker push handler + Edge Function + Postgres webhook)
+   is deployed and the DB→Edge-Function leg was verified directly (a test webhook call got a
+   clean 200 response). What hasn't been verified: an actual OS-level notification arriving on
+   a real device after enabling it via Profile / partner.html's "Enable notifications" button.
+   If it doesn't fire, check (in order): was permission actually granted (browser-level, not
+   just app-level)? Does `push_subscriptions` have a row for that device (`select * from
+   push_subscriptions`)? Check the `send-push` Edge Function's logs (`query_logs` MCP tool,
+   source `function_edge_logs`) for the actual invocation and any error.
+2. **`supabase/tests/rls-and-transitions.test.js` hasn't been updated** for any of migrations
+   0002 through 0007 — it only exercises the original 0001 schema.
+3. **Chat/push secrets aren't in this repo, by design.** The VAPID private key and the
+   DB→Edge-Function webhook secret live only in Supabase Vault (`vault.decrypted_secrets`,
+   names `vapid_private_key` / `push_webhook_secret`) — 0005's migration file has a comment
+   explaining this rather than the actual `vault.create_secret()` calls (re-running those on a
+   fresh apply would error, since the names already exist). The VAPID **public** key is not
+   secret and is hardcoded in both `api-client.js` and `supabase/functions/send-push/index.ts`.
+4. **Anonymous Sign-Ins, once a blocker, now work fine** — resolved a few sessions ago. Don't
+   assume it's broken by default anymore; if auth-dependent features ever fail again, `select
+   count(*) from auth.users` is the fastest way to check.
+5. **Deleting a synced memory is best-effort, not queued.** If you delete a Timeline entry while
    offline (or the delete call fails), the local copy is gone immediately but the remote
    row/photo can be left behind — deletes aren't retried like creates are (see
-   `js/db/memory-store.js`'s `deleteMemory`). A deliberate scope cut, not an oversight; revisit
-   if stray remote rows become an actual problem.
-3. **`supabase/tests/rls-and-transitions.test.js` hasn't been updated** for the 0002 (comfort
-   access) or 0003 (memories) migrations — it only exercises the original 0001 schema.
-4. **Anonymous Sign-Ins, once a blocker, now work fine** — resolved a couple of sessions ago.
-   Don't assume it's broken by default anymore; if auth-dependent features ever fail again,
-   `select count(*) from auth.users` is the fastest way to check.
+   `js/db/memory-store.js`'s `deleteMemory`). A deliberate scope cut, not an oversight.
 
 ---
 
 ## 4. Recent debugging/feature history (most recent session first)
 
-**This session — expanded support-network access, twice:**
+**Most recent session — chat, push notifications, and a real two-tab partner app:**
+Account owner asked for: (1) real notifications with delivery/read receipts and two-way
+replies "same as a WhatsApp chat", and (2) the partner side restructured to mirror the owner's
+— a Requests tab (with chat per request) and a Timeline tab (with upload). Built:
+- **Per-dispatch chat**: new `dispatch_messages` table, RLS, Realtime (first use of Supabase
+  Realtime in this app — everything else polls). Read receipts are per-message (`read_at`,
+  settable only by the non-sender, enforced by trigger) plus a separate "Seen" receipt on the
+  dispatch itself (`member_viewed_at`, set via `mark_dispatch_viewed()` RPC when a member opens
+  a request's chat). `js/lib/chat.js` is the shared UI, mounted on both `dispatch.html` (owner)
+  and `partner.html` (member).
+- **Real Web Push notifications**: VAPID keys generated and stored (private key in Supabase
+  Vault, public key hardcoded client-side — see §3, item 3). A `send-push` Edge Function,
+  triggered by `pg_net` webhooks on `dispatch_messages`/`dispatches` inserts, sends to whichever
+  side didn't cause the event, targeted precisely (the dispatch's specific assignee, not every
+  support-network member). Service worker has `push`/`notificationclick` handlers;
+  `js/lib/push.js` handles subscribing. Opt-in button on Profile (owner) and partner.html
+  (member) — not automatic, since browser notification permission has to be a real user gesture.
+- **Partner side restructured into two pages**: `partner.html` (Requests, was the whole app)
+  and new `partner-timeline.html` (Timeline; only shown/reachable for `full_support_access`
+  members). Shared nav + eligibility logic in `js/partner-shared.js`. A member with full access
+  can now **add** Timeline memories (own photo upload, compressed client-side like the owner's
+  always were) via a new `create_memory_as_support_member()` RPC + a Storage insert policy —
+  previously members could only read the owner's Timeline, never contribute to it.
+- Chat's open thread lives in a DOM location (`#chat-panel`) that the dispatch list's 20s poll
+  never touches, deliberately — an earlier inline-per-card design would have wiped out a
+  half-typed message every time the list refreshed.
+- Tightened `dispatch_messages`'s UPDATE RLS policy after first-draft review: it originally
+  used `using (true)`, relying only on a trigger to stop misuse — the trigger blocked a sender
+  from marking their own message read, but didn't stop an unrelated authenticated user from
+  touching a message on a dispatch they have nothing to do with, given the id.
+
+**Earlier — expanded support-network access, twice:**
 1. First pass: added a permission-level picker to both invite flows
    (`dispatch_recipient` / `full_support_access`), and a new RLS policy
    (`0002_support_member_comfort_access.sql`) so `full_support_access` members can read the
@@ -179,10 +229,21 @@ paths or `window.location.origin` alone. Watch for this pattern in anything new:
     from the server on every refresh (not cached), since the owner can change it later via the
     already-existing (if UI-unwired for *changing* an existing member) `updatePermissionLevel()`.
 - **RLS is the real security boundary**, not the app code. `supabase/migrations/`:
-  `0001_init.sql` (original schema/policies), `0002_support_member_comfort_access.sql`
-  (comfort_entries → full_support_access members), `0003_memories_sync.sql` (memories table +
-  Storage bucket + policies). `supabase/tests/rls-and-transitions.test.js` only covers 0001 (see
-  §3, item 3).
+  `0001_init.sql` (original schema/policies) through `0007_*.sql` (see §6's file map for what
+  each does). `supabase/tests/rls-and-transitions.test.js` only covers 0001 (see §3).
+- **Almost everything polls every 20s; chat is the one exception.** Chat uses Supabase Realtime
+  (`client.channel(...).on('postgres_changes', ...)`, in `subscribeToDispatchMessages()` in
+  api-client.js) since a 20s-delayed chat message would feel broken in a way a 20s-delayed
+  dispatch status update doesn't. If Realtime ever needs disabling/debugging, the fallback is
+  that `js/lib/chat.js`'s `refresh()` still works fine called manually — Realtime is additive,
+  not the only way messages arrive.
+- **Push notifications have no server of their own to run on** (this app has no custom
+  backend/cron) — delivery is entirely event-driven: a Postgres trigger (`pg_net.http_post`)
+  fires on relevant inserts, calls the `send-push` Edge Function over HTTP with a shared secret
+  (not a user JWT — `verify_jwt: false` on that function, deliberately), which looks up
+  `push_subscriptions` and sends via the Web Push protocol (`npm:web-push` inside Deno). VAPID
+  private key and the webhook secret live in Supabase Vault, never in this repo or client code
+  (see §3, item 3).
 
 ---
 
@@ -191,32 +252,46 @@ paths or `window.location.origin` alone. Watch for this pattern in anything new:
 ```text
 public/                      # entire frontend — static, deployable anywhere
   *.html                       # one file per screen (index=Home, comfort, care=Appointment
-                                #   Ledger, timeline=Journey feature, support-network,
-                                #   partner=invited-member view, profile, onboarding)
+                                #   Ledger, timeline=Journey feature, support-network, profile,
+                                #   onboarding, dispatch=create/view one craving request+chat)
+  partner.html                  # member's Requests tab (chat per request, mood/energy summary)
+  partner-timeline.html         # member's Timeline tab (full_support_access only; can upload)
   manifest.webmanifest          # owner's PWA manifest (start_url: index.html)
   partner-manifest.webmanifest  # support-network member's PWA manifest (start_url: partner.html)
   css/tokens.css                # design tokens ("Modern Nurturing": sage green + dusty rose)
-  css/base.css, components.css  # resets + reusable component classes
-  js/api-client.js              # all Supabase calls (Postgres + Storage), lazy-loaded, fail-soft
+  css/base.css, components.css  # resets + reusable component classes (incl. .chat-bubble etc.)
+  js/api-client.js              # all Supabase calls (Postgres + Storage + Realtime), lazy, fail-soft
   js/app.js                     # shared boot: bottom nav, disclaimer gate, a11y prefs, session,
                                  #   new-device resume, offline sync-queue wiring
   js/identity.js                # resolves current Supabase Auth identity
+  js/partner-shared.js          # member-side nav + eligibility checks (partner.html/-timeline.html)
   js/lib/image-compress.js      # canvas-based photo compression before Storage upload
+  js/lib/chat.js                # shared chat UI, mounted on dispatch.html AND partner.html
+  js/lib/push.js                # Web Push subscribe/unsubscribe helper
   js/db/                        # one IndexedDB/localStorage + sync module per entity
   js/models/                    # pure factory/validation functions, no I/O
   js/views/                     # one controller module per page
-  service-worker.js             # offline app-shell caching, CACHE_NAME v9
+  service-worker.js             # offline app-shell caching + push/notificationclick, CACHE_NAME v12
+
+supabase/functions/send-push/index.ts   # Web Push sender, invoked by pg_net webhooks (Deno)
 
 supabase/migrations/
   0001_init.sql                            # schema + RLS + status trigger + accept_invite() RPC
   0002_support_member_comfort_access.sql   # RLS: full_support_access members read comfort_entries
   0003_memories_sync.sql                   # memories table + Storage bucket + RLS
+  0004_accept_invite_resumable.sql         # accept_invite() resumes non-revoked, not pending-only
+  0005_chat_and_push_notifications.sql     # dispatch_messages, push_subscriptions, member memory
+                                            #   uploads, pg_net webhook wiring (secrets NOT included)
+  0006_push_secrets_rpc.sql                # locked-down RPC the edge function uses to read Vault
+  0007_dispatch_messages_update_policy_fix.sql   # tightened an overly-permissive RLS policy
 supabase/tests/                      # RLS/transition tests — only covers 0001 (see §3)
 tests/unit/*.test.html               # browser-run assertion pages, open directly
 
 specs/001-crave-and-care-mvp/        # spec, plan, data model, API contract, tasks (Spec Kit) —
-                                      #   spec.md is current; data-model.md/tasks.md/quickstart.md
-                                      #   predate Timeline + permission tiers (see §1)
+                                      #   spec.md covers permission tiers/Timeline sharing but NOT
+                                      #   chat/push/member-uploads yet (this session's work isn't
+                                      #   reflected in spec.md — a gap worth closing);
+                                      #   data-model.md/tasks.md/quickstart.md are all stale
 .github/workflows/deploy-pages.yml   # GitHub Pages CI/CD, triggers on push to main
 ```
 
