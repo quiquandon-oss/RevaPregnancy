@@ -1,6 +1,8 @@
 import { bootPage } from "../app.js";
 import { createProfile, acknowledgeDisclaimer, getProfile } from "../db/profile-store.js";
 import { signInWithEmail } from "../api-client.js";
+import { createInvite } from "../db/support-store.js";
+import { inviteLink } from "../models/support-member.js";
 
 const STEPS = ["welcome", "profile", "invite", "preview", "disclaimer"];
 
@@ -29,8 +31,40 @@ function wireStepButtons() {
   }
   document.querySelector("[data-back]")?.addEventListener("click", () => showStep("welcome"));
   document.getElementById("returning-user-link").addEventListener("click", () => showStep("sign-in"));
-  document.getElementById("invite-now").addEventListener("click", () => {
-    window.location.href = "support-network.html";
+}
+
+// Creates the invite right here on the invite step instead of navigating to
+// support-network.html. That page enforces the disclaimer gate (FR-025), and per the
+// spec's onboarding order (FR-024) this step happens *before* the disclaimer step, so
+// navigating there would just bounce the user straight back to onboarding's welcome
+// screen with no explanation. Staying on onboarding.html (exempt from the gate) fixes that.
+function wireInviteStep() {
+  document.getElementById("invite-now").addEventListener("click", async () => {
+    const errorEl = document.getElementById("onboarding-invite-error");
+    errorEl.hidden = true;
+    try {
+      const member = await createInvite("dispatch_recipient");
+      const link = inviteLink(member.inviteCode);
+      document.getElementById("onboarding-invite-link").value = link;
+      const message = `Here's my Crave & Care invite — no account needed, just tap the link: ${link}`;
+      document.getElementById("onboarding-whatsapp-invite-link").href = `https://wa.me/?text=${encodeURIComponent(message)}`;
+      document.getElementById("onboarding-invite-card").hidden = false;
+      document.getElementById("onboarding-invite-skip").textContent = "Continue";
+    } catch (error) {
+      errorEl.textContent = "That didn't go through — check your connection and try again in a moment.";
+      errorEl.hidden = false;
+    }
+  });
+
+  document.getElementById("onboarding-copy-invite-link").addEventListener("click", async () => {
+    const input = document.getElementById("onboarding-invite-link");
+    input.select();
+    try {
+      await navigator.clipboard.writeText(input.value);
+    } catch {
+      // Clipboard access can be blocked in some contexts; the link is still visible/selected
+      // for a manual copy, so this is a silent, non-blocking fallback.
+    }
   });
 }
 
@@ -85,6 +119,7 @@ function wireSignIn() {
 async function main() {
   await bootPage({ skipDisclaimerGate: true });
   wireStepButtons();
+  wireInviteStep();
   wireDisclaimer();
   wireSignIn();
   showStep("welcome");
