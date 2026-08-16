@@ -1,6 +1,6 @@
 import { bootPage } from "../app.js";
 import { getCurrentIdentity } from "../identity.js";
-import { acceptInviteAsThisDevice, getThisDeviceMemberRowId, refreshThisDeviceMember } from "../db/support-store.js";
+import { acceptInviteAsThisDevice, getThisDeviceMemberRowId, getThisDeviceMember, refreshThisDeviceMember } from "../db/support-store.js";
 import { refreshAssigneeDispatches, getCachedDispatches, updateStatus } from "../db/dispatch-store.js";
 import { CATEGORY_LABELS, statusLabel, isActive, canTransition } from "../models/dispatch.js";
 import { ENERGY_LABELS } from "../models/comfort-entry.js";
@@ -176,9 +176,15 @@ async function main() {
   await getCurrentIdentity(); // ensures an anonymous session exists for a brand-new device
 
   const inviteCode = new URLSearchParams(window.location.search).get("invite");
-  const existingMemberRowId = getThisDeviceMemberRowId();
+  const existingMember = await getThisDeviceMember();
 
-  if (inviteCode && !existingMemberRowId) {
+  // A device can end up holding an invite it accepted previously that's since been revoked
+  // and replaced with a fresh one for the same person (exactly what happened testing this: an
+  // invite got revoked and re-created). Without comparing invite codes here, once *any* invite
+  // had ever been accepted on a device, opening a brand-new invite link would be silently
+  // ignored — the device would stay stuck on the old, now-revoked membership forever, with no
+  // error and no obvious way to tell why nothing showed up.
+  if (inviteCode && (!existingMember || existingMember.inviteCode !== inviteCode)) {
     await handleInviteAcceptance(inviteCode);
     return;
   }

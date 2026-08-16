@@ -3,7 +3,7 @@
 // app shell works offline from the very first launch, not just pages visited so far; anything
 // not listed here (e.g. a future page) still gets covered at runtime via stale-while-revalidate.
 
-const CACHE_NAME = "crave-and-care-v10";
+const CACHE_NAME = "crave-and-care-v11";
 
 const CORE_ASSETS = [
   // Pages
