@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Timeline — Crave & Care</title>
+    <meta name="theme-color" content="#8fae8b" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="css/tokens.css" />
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/components.css" />
+  </head>
+  <body>
+    <main class="app-main stack">
+      <h1>Full Journey Timeline</h1>
+      <p class="micro">
+        Photos, scans, and little moments worth keeping — saved on this device only.
+      </p>
+
+      <div class="chip-row" id="filter-chips" role="group" aria-label="Filter memories">
+        <button class="chip" data-filter="all" aria-pressed="true">All Memories</button>
+        <button class="chip" data-filter="photo" aria-pressed="false">Photos</button>
+        <button class="chip" data-filter="ultrasound" aria-pressed="false">Ultrasounds</button>
+        <button class="chip" data-filter="milestone" aria-pressed="false">Milestones</button>
+      </div>
+
+      <button class="btn btn-primary btn-block" id="add-memory-toggle">+ Add a memory</button>
+
+      <div id="add-memory-card" class="card stack" hidden>
+        <div class="field">
+          <label for="memory-title">Title</label>
+          <input type="text" id="memory-title" placeholder="e.g. Week 24 - Halfway there!" />
+        </div>
+        <div class="field">
+          <label for="memory-date">Date</label>
+          <input type="date" id="memory-date" />
+        </div>
+        <div class="field">
+          <label for="memory-category">Type</label>
+          <select id="memory-category">
+            <option value="photo">Photo</option>
+            <option value="ultrasound">Ultrasound</option>
+            <option value="milestone">Milestone</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="memory-note">Note (optional)</label>
+          <textarea id="memory-note" placeholder="What do you want to remember about this moment?"></textarea>
+        </div>
+        <div class="field">
+          <label for="memory-photo">Photo (optional)</label>
+          <input type="file" id="memory-photo" accept="image/*" />
+        </div>
+        <button class="btn btn-primary btn-block" id="save-memory">Save memory</button>
+        <p id="memory-error" class="micro" style="color: var(--color-danger)" hidden></p>
+      </div>
+
+      <section id="empty-memories" class="card" hidden>
+        <p>No memories saved yet. Add your first one whenever you're ready.</p>
+      </section>
+
+      <div class="timeline stack" id="memory-list"></div>
+    </main>
+
+    <script type="module" src="js/views/timeline.js"></script>
+  </body>
+</html>

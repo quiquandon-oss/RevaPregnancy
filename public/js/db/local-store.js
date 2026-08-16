@@ -2,7 +2,7 @@
 // Entity-specific stores (dispatch-store.js, comfort-store.js, etc.) build on top of this.
 
 const DB_NAME = "crave-and-care";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 const STORES = {
   appointments: { keyPath: "id" },
@@ -11,6 +11,7 @@ const STORES = {
   dispatches: { keyPath: "id" },
   supportMembers: { keyPath: "id" },
   syncQueue: { keyPath: "id", autoIncrement: true, indexes: ["createdAt"] },
+  memories: { keyPath: "id" },
 };
 
 let dbPromise = null;

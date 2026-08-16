@@ -3,7 +3,7 @@
 // app shell works offline from the very first launch, not just pages visited so far; anything
 // not listed here (e.g. a future page) still gets covered at runtime via stale-while-revalidate.
 
-const CACHE_NAME = "crave-and-care-v2";
+const CACHE_NAME = "crave-and-care-v3";
 
 const CORE_ASSETS = [
   // Pages
@@ -12,6 +12,7 @@ const CORE_ASSETS = [
   "comfort.html",
   "care.html",
   "appointment-edit.html",
+  "timeline.html",
   "profile.html",
   "support-network.html",
   "partner.html",
@@ -32,6 +33,7 @@ const CORE_ASSETS = [
   "js/db/comfort-store.js",
   "js/db/appointment-store.js",
   "js/db/support-store.js",
+  "js/db/memory-store.js",
   "js/data/comfort-statuses.js",
   // Models
   "js/models/dispatch.js",
@@ -39,12 +41,14 @@ const CORE_ASSETS = [
   "js/models/appointment.js",
   "js/models/question.js",
   "js/models/support-member.js",
+  "js/models/memory.js",
   // Views
   "js/views/home.js",
   "js/views/dispatch.js",
   "js/views/comfort.js",
   "js/views/care.js",
   "js/views/appointment-edit.js",
+  "js/views/timeline.js",
   "js/views/profile.js",
   "js/views/support-network.js",
   "js/views/partner.js",

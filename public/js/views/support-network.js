@@ -48,6 +48,8 @@ function wireCreateInvite() {
       const member = await createInvite("dispatch_recipient");
       const link = inviteLink(member.inviteCode);
       document.getElementById("invite-link").value = link;
+      const message = `Here's my Crave & Care invite — no account needed, just tap the link: ${link}`;
+      document.getElementById("whatsapp-invite-link").href = `https://wa.me/?text=${encodeURIComponent(message)}`;
       document.getElementById("new-invite-card").hidden = false;
       await refresh();
     } catch (error) {
