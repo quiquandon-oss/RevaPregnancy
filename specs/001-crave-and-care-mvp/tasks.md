@@ -32,17 +32,17 @@ story.
 
 **Purpose**: Repository scaffolding shared by every later phase.
 
-- [ ] T001 Create the directory structure from plan.md's Project Structure: `public/css/`,
+- [X] T001 Create the directory structure from plan.md's Project Structure: `public/css/`,
       `public/js/db/`, `public/js/models/`, `public/js/views/`, `public/icons/`, `supabase/migrations/`,
       `supabase/tests/`, `tests/unit/`
-- [ ] T002 [P] Run `supabase init` to create `supabase/config.toml` for local development (per
+- [X] T002 [P] Run `supabase init` to create `supabase/config.toml` for local development (per
       quickstart.md §2)
-- [ ] T003 [P] Create `public/css/tokens.css` with the "Modern Nurturing" design tokens as CSS
+- [X] T003 [P] Create `public/css/tokens.css` with the "Modern Nurturing" design tokens as CSS
       custom properties: color palette, type scale, spacing unit (4px), radii, shadow, from the
       product blueprint §2
-- [ ] T004 [P] Create `public/manifest.webmanifest` (app name, theme/background colors from
+- [X] T004 [P] Create `public/manifest.webmanifest` (app name, theme/background colors from
       tokens, icon references) and placeholder PWA icons in `public/icons/`
-- [ ] T005 [P] Add `.editorconfig` and a minimal flat-config ESLint setup (no bundler) covering
+- [X] T005 [P] Add `.editorconfig` and a minimal flat-config ESLint setup (no bundler) covering
       `public/js/**` and `supabase/**/*.js` for consistent style with zero build step
 
 ---
@@ -52,41 +52,41 @@ story.
 **Purpose**: Infrastructure every user story depends on. **No user story work starts before this
 phase is complete.**
 
-- [ ] T006 Write `supabase/migrations/0001_init.sql`: create the `dispatches`,
+- [X] T006 Write `supabase/migrations/0001_init.sql`: create the `dispatches`,
       `support_network_members`, and `comfort_entries` tables with the fields, enums, and foreign
       keys from data-model.md; enable Row Level Security on all three
-- [ ] T007 In `supabase/migrations/0001_init.sql`, add RLS policies for `dispatches` (owner can
+- [X] T007 In `supabase/migrations/0001_init.sql`, add RLS policies for `dispatches` (owner can
       insert/select/cancel; assigned member can select/advance status) per contracts/api.md
       (depends on T006)
-- [ ] T008 In `supabase/migrations/0001_init.sql`, add RLS policies for
+- [X] T008 In `supabase/migrations/0001_init.sql`, add RLS policies for
       `support_network_members` (owner can insert/select/update; invitee can read only their own
       invite by code) per contracts/api.md (depends on T006)
-- [ ] T009 In `supabase/migrations/0001_init.sql`, add RLS policies for `comfort_entries`
+- [X] T009 In `supabase/migrations/0001_init.sql`, add RLS policies for `comfort_entries`
       (owner-only insert/select/update, keyed by `owner_id = auth.uid()`; no assignee/sharing
       path exists for this table) per contracts/api.md (depends on T006)
-- [ ] T010 In `supabase/migrations/0001_init.sql`, add the `BEFORE UPDATE` trigger enforcing the
+- [X] T010 In `supabase/migrations/0001_init.sql`, add the `BEFORE UPDATE` trigger enforcing the
       `dispatches.status` state machine from data-model.md (rejects any transition outside
       `requested→accepted→on_the_way→delivered`, `requested/accepted→cancelled`) (depends on
       T006)
-- [ ] T011 In `supabase/migrations/0001_init.sql`, add the `accept_invite(invite_code,
+- [X] T011 In `supabase/migrations/0001_init.sql`, add the `accept_invite(invite_code,
       display_name)` `SECURITY DEFINER` RPC function that atomically stamps
       `member_auth_id = auth.uid()` per contracts/api.md (depends on T006)
-- [ ] T012 [P] Create `public/js/db/local-store.js`: a native-IndexedDB wrapper opening the app
+- [X] T012 [P] Create `public/js/db/local-store.js`: a native-IndexedDB wrapper opening the app
       database and exposing generic `get`/`put`/`delete`/`queryByIndex` helpers, used by every
       client-only entity and as the local read-cache for every Supabase-synced entity
-- [ ] T013 [P] Create `public/js/db/sync-queue.js`: an offline write-queue skeleton (enqueue a
+- [X] T013 [P] Create `public/js/db/sync-queue.js`: an offline write-queue skeleton (enqueue a
       pending Supabase write, replay queued writes on `online` events and on page load) used by
       the three server-synced entities
-- [ ] T014 [P] Create `public/js/api-client.js`: import `supabase-js` as an ES module (CDN, no
+- [X] T014 [P] Create `public/js/api-client.js`: import `supabase-js` as an ES module (CDN, no
       build step), initialize the client, and implement the session bootstrap from
       contracts/api.md (`getSession()` → `signInAnonymously()` if absent)
-- [ ] T015 [P] Create `public/css/base.css` (resets, typography, layout primitives) and
+- [X] T015 [P] Create `public/css/base.css` (resets, typography, layout primitives) and
       `public/css/components.css` (cards, pill buttons, segmented slider, bottom nav, status
       banner) built on `tokens.css` custom properties
-- [ ] T016 [P] Create `public/js/app.js`: shared page boot — inject/render the bottom nav,
+- [X] T016 [P] Create `public/js/app.js`: shared page boot — inject/render the bottom nav,
       initialize the Supabase session (via api-client.js), and expose a disclaimer-gate check
       stub (wired to real logic in T058)
-- [ ] T017 [P] Create `public/service-worker.js`: Cache-API-based app-shell caching (install/
+- [X] T017 [P] Create `public/service-worker.js`: Cache-API-based app-shell caching (install/
       activate/fetch handlers) and register it from `app.js`
 
 **Checkpoint**: Foundation ready — user story phases below can now proceed.

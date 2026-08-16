@@ -1,0 +1,89 @@
+/*
+  Crave & Care — "Modern Nurturing" design tokens.
+  Source: product blueprint §2. All colors are checked for WCAG 2.1 AA
+  text contrast against the surfaces they're paired with in components.css.
+*/
+
+:root {
+  /* Color palette */
+  --color-primary: #8fae8b;
+  --color-primary-dark: #5a7a57;
+  --color-secondary: #d4a5a5;
+  --color-secondary-soft: #f5e6e6;
+  --color-tertiary: #f5f2ed;
+  --color-neutral-dark: #4a4a4a;
+  --color-neutral-mid: #6f6f6f; /* darkened from #8a8a8a to clear AA on white */
+  --color-neutral-light: #e8e4df;
+  --color-accent-purple: #7a6cc0; /* darkened from #8b7ec8 to clear AA on white */
+  --color-white: #ffffff;
+  --color-success: var(--color-primary-dark);
+  --color-warning-soft: var(--color-secondary);
+  --color-danger: #b3564f;
+
+  /* Typography */
+  --font-display: "Playfair Display", "Cormorant Garamond", Georgia, serif;
+  --font-body: "Inter", "Source Sans 3", system-ui, sans-serif;
+
+  --text-display: clamp(1.75rem, 1.5rem + 1vw, 2rem); /* 28-32px */
+  --text-section: clamp(1.25rem, 1.15rem + 0.4vw, 1.375rem); /* 20-22px */
+  --text-body: 1rem; /* 16px */
+  --text-label: 0.875rem; /* 14px */
+  --text-micro: 0.75rem; /* 12px */
+
+  --leading-display: 1.2;
+  --leading-body: 1.5;
+
+  /* Spacing (4px base unit) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Radius */
+  --radius-card: 22px;
+  --radius-pill: 999px;
+  --radius-icon-button: 16px;
+
+  /* Elevation */
+  --shadow-card: 0 4px 20px rgba(74, 74, 74, 0.06);
+  --shadow-modal: 0 8px 32px rgba(74, 74, 74, 0.12);
+
+  /* Touch targets */
+  --touch-target-min: 48px;
+
+  /* Motion */
+  --motion-fast: 150ms;
+  --motion-medium: 250ms;
+  --motion-ease: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Reduced-motion mode: explicit in-app toggle */
+:root[data-motion="reduced"] {
+  --motion-fast: 0ms;
+  --motion-medium: 0ms;
+}
+
+/* Reduced-motion mode: OS-level preference, unless the user explicitly chose "full" in-app */
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="full"]) {
+    --motion-fast: 0ms;
+    --motion-medium: 0ms;
+  }
+}
+
+/* High-contrast mode: explicit in-app toggle, layered on top of the base palette */
+:root[data-contrast="high"] {
+  --color-primary: #3f6b3b;
+  --color-primary-dark: #2c4c2a;
+  --color-secondary: #a24b4b;
+  --color-neutral-dark: #1f1f1f;
+  --color-neutral-mid: #3a3a3a;
+  --color-neutral-light: #b9b9b9;
+  --color-tertiary: #ffffff;
+  --shadow-card: 0 0 0 1px var(--color-neutral-dark);
+}
