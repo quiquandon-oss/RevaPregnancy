@@ -118,16 +118,30 @@ if this project gets a "real" Spec Kit pass again rather than incremental chat-d
    `js/db/memory-store.js`'s `deleteMemory`). A deliberate scope cut, not an oversight.
 6. **The owner's Redmi 15 has an unresolved data-loss problem** (MIUI appears to be clearing
    site storage between launches, wiping the local Supabase session and creating a brand-new
-   empty anonymous account each time). Her real account/data is still intact server-side
-   (`e67e5c72-26d9-4de3-9ef2-ad4992ab0627` as of this writing — confirm it's still the one
-   `support_network_members` and the bulk of `memories`/`dispatches`/`comfort_entries` point
-   to). A visible "Account ID" was added to Profile (bottom of page) specifically so a fresh
-   session on her device can be identified and its `owner_id` manually migrated back onto the
-   real account's data via SQL — safe (touches ordinary data columns, not Auth internals), but
-   was NOT done as of this session because the Account ID was never provided. If this comes up
-   again: get that ID, then update `owner_id` on `dispatches`/`comfort_entries`/`memories`
-   /`support_network_members` from the old orphaned real-data id to whatever her current one is
-   — or vice versa, whichever she's actively using when you do it.
+   empty anonymous account each time — this happened repeatedly across this whole session,
+   confirmed via `auth.users`). The underlying cause is NOT fixed — only worked around once.
+   **Current authoritative owner_id: `2a9f9020-bb1f-405e-8612-70a27c0e9594`** (all
+   `dispatches`/`comfort_entries`/`memories`/`push_subscriptions`/`support_network_members`
+   were manually reconciled onto this id in this session — verified zero orphaned rows
+   afterward). If she loses access again (very possible — nothing was fixed about *why* this
+   keeps happening, only cleaned up after the fact), repeat the same process:
+   1. Get her current Account ID from Profile (bottom of page).
+   2. Reconcile every table's `owner_id` from whatever the last-known-good id was onto the new
+      one. **Watch for trigger interference**: `dispatches`, `support_network_members`, and
+      `comfort_entries` all have `BEFORE UPDATE` triggers that force `owner_id` back to its old
+      value (and `dispatches`'s additionally blocks any update once status is
+      `delivered`/`cancelled`) — this broke the update silently/loudly the first time. Wrap the
+      `UPDATE` in `ALTER TABLE ... DISABLE TRIGGER ...` / `ENABLE TRIGGER ...` around each
+      affected table for this one-off admin operation. `memories` and `push_subscriptions` have
+      no such trigger and update directly.
+   3. Also check for orphaned data under *any other* stray anonymous id, not just the one
+      previously assumed authoritative — this session found a second, unrelated orphan pool
+      (a `dispatches` row under yet another id) that wasn't caught by only comparing "old vs
+      current" — a broader sweep (`select owner_id, count(*) from ... group by owner_id`) is
+      more reliable than assuming there are only two ids in play.
+   4. This is a stopgap, not a fix. The real fix is either resolving the MIUI storage-clearing
+      behavior on her end, or a login mechanism that survives it (blocked on Supabase's email
+      deliverability — see item 1b above).
 
 ---
 
