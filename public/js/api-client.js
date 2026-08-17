@@ -310,6 +310,19 @@ export async function deletePushSubscription(endpoint) {
   return withClient((client) => client.from("push_subscriptions").delete().eq("endpoint", endpoint));
 }
 
+// Deliberately independent of Supabase Auth's own email (linkEmail/signInWithEmail below,
+// which the account-linking flow depends on and can be blocked by email deliverability
+// issues) — just "where should an alert go", nothing more.
+export async function saveNotificationEmail({ ownerId, email }) {
+  return withClient((client) =>
+    client.from("notification_contacts").upsert({ owner_id: ownerId, email }, { onConflict: "auth_id" }).select().single()
+  );
+}
+
+export async function getMyNotificationEmail() {
+  return withClient((client) => client.from("notification_contacts").select("email").maybeSingle());
+}
+
 // ---------------------------------------------------------------------------
 // Account linking (optional, FR-031)
 // ---------------------------------------------------------------------------

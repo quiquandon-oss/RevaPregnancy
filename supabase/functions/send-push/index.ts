@@ -1,7 +1,9 @@
 // send-push: triggered by Postgres (dispatch_messages/dispatches inserts, via pg_net + a
 // shared secret, not a real user JWT — this is an internal webhook, not a public endpoint).
-// Looks up who should be notified for the given owner_id, and sends a Web Push notification
-// to each of their stored push_subscriptions using VAPID auth.
+// Looks up who should be notified for the given owner_id, and sends BOTH a Web Push
+// notification (push_subscriptions) and an email via Resend (notification_contacts) — two
+// independent channels, since push alone depends on the browser/OS keeping a service worker
+// alive, which is exactly what's unreliable on the device that prompted adding email at all.
 //
 // verify_jwt is disabled for this function (see deploy call) since the caller is the database
 // itself, not an end user with a Supabase session — auth here is the x-webhook-secret header
@@ -12,6 +14,23 @@ import webpush from "npm:web-push@3.6.7";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const RESEND_FROM = "Crave & Care <onboarding@resend.dev>";
+
+async function sendEmail(resendApiKey: string, to: string, subject: string, text: string) {
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${resendApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ from: RESEND_FROM, to: [to], subject, text }),
+    });
+    if (!res.ok) console.error("resend send failed", res.status, await res.text());
+  } catch (err) {
+    console.error("resend send threw", err);
+  }
+}
 
 Deno.serve(async (req) => {
   try {
@@ -24,7 +43,11 @@ Deno.serve(async (req) => {
       console.error("could not load push secrets", secretsError);
       return new Response("internal error", { status: 500 });
     }
-    const { vapid_private_key: vapidPrivateKey, webhook_secret: expectedSecret } = secrets[0];
+    const {
+      vapid_private_key: vapidPrivateKey,
+      webhook_secret: expectedSecret,
+      resend_api_key: resendApiKey,
+    } = secrets[0];
     if (!expectedSecret || req.headers.get("x-webhook-secret") !== expectedSecret) {
       return new Response("unauthorized", { status: 401 });
     }
@@ -85,23 +108,19 @@ Deno.serve(async (req) => {
 
     if (!recipientAuthId) return new Response("no recipient", { status: 200 });
 
-    const { data: subs } = await admin
-      .from("push_subscriptions")
-      .select("endpoint, p256dh, auth_key")
-      .eq("auth_id", recipientAuthId);
+    const [{ data: subs }, { data: contact }] = await Promise.all([
+      admin.from("push_subscriptions").select("endpoint, p256dh, auth_key").eq("auth_id", recipientAuthId),
+      admin.from("notification_contacts").select("email").eq("auth_id", recipientAuthId).maybeSingle(),
+    ]);
 
     const targets = subs || [];
-
     const payload = JSON.stringify({ title, body, url: "./" });
 
-    await Promise.all(
-      targets.map(async (sub) => {
+    const results = await Promise.allSettled([
+      ...targets.map(async (sub) => {
         try {
           await webpush.sendNotification(
-            {
-              endpoint: sub.endpoint,
-              keys: { p256dh: sub.p256dh, auth: sub.auth_key },
-            },
+            { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth_key } },
             payload
           );
         } catch (err) {
@@ -112,10 +131,11 @@ Deno.serve(async (req) => {
             await admin.from("push_subscriptions").delete().eq("endpoint", sub.endpoint);
           }
         }
-      })
-    );
+      }),
+      resendApiKey && contact?.email ? sendEmail(resendApiKey, contact.email, title, body) : Promise.resolve(),
+    ]);
 
-    return new Response(JSON.stringify({ sent: targets.length }), {
+    return new Response(JSON.stringify({ pushSent: targets.length, emailSent: !!contact?.email, results: results.length }), {
       headers: { "Content-Type": "application/json" },
     });
   } catch (err) {

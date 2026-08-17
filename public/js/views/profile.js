@@ -1,6 +1,6 @@
 import { bootPage, setMotionPreference, setContrastPreference } from "../app.js";
 import { getProfile, updateProfile } from "../db/profile-store.js";
-import { linkEmail } from "../api-client.js";
+import { linkEmail, saveNotificationEmail, getMyNotificationEmail } from "../api-client.js";
 import { listAcceptedSupportMembers } from "../db/support-store.js";
 import { getCurrentIdentity } from "../identity.js";
 import { isPushSupported, enablePush, getExistingSubscription } from "../lib/push.js";
@@ -119,15 +119,32 @@ function wirePushToggle() {
   });
 }
 
+function wireNotifyEmail() {
+  document.getElementById("save-notify-email").addEventListener("click", async () => {
+    const email = document.getElementById("notify-email").value.trim();
+    const statusEl = document.getElementById("notify-email-status");
+    if (!email) return;
+    const { ownerId } = await getCurrentIdentity();
+    const { error } = await saveNotificationEmail({ ownerId, email });
+    statusEl.hidden = false;
+    statusEl.textContent = error
+      ? "That didn't save — check your connection and try again."
+      : "Saved — alerts will also go to this email.";
+  });
+}
+
 async function main() {
   await bootPage();
   await loadIntoForm();
   wireSave();
   wireEmailLink();
   wirePushToggle();
+  wireNotifyEmail();
   await refreshPushUi();
   const { ownerId } = await getCurrentIdentity();
   document.getElementById("account-id").textContent = ownerId || "Not available yet — try again in a moment.";
+  const { data: contact } = await getMyNotificationEmail();
+  if (contact?.email) document.getElementById("notify-email").value = contact.email;
 }
 
 main();

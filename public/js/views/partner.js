@@ -4,7 +4,7 @@ import { acceptInviteAsThisDevice, getThisDeviceMemberRowId, getThisDeviceMember
 import { refreshAssigneeDispatches, getCachedDispatches, updateStatus } from "../db/dispatch-store.js";
 import { CATEGORY_LABELS, statusLabel, isActive, canTransition } from "../models/dispatch.js";
 import { ENERGY_LABELS } from "../models/comfort-entry.js";
-import { listOwnerComfortEntries, markDispatchViewed } from "../api-client.js";
+import { listOwnerComfortEntries, markDispatchViewed, saveNotificationEmail, getMyNotificationEmail } from "../api-client.js";
 import { mountChat } from "../lib/chat.js";
 import { isPushSupported, enablePush, getExistingSubscription } from "../lib/push.js";
 import { renderPartnerNav } from "../partner-shared.js";
@@ -167,6 +167,19 @@ function wirePushPrompt() {
   });
 }
 
+function wireNotifyEmail() {
+  document.getElementById("save-notify-email").addEventListener("click", async () => {
+    const email = document.getElementById("notify-email").value.trim();
+    const statusEl = document.getElementById("notify-email-status");
+    if (!email || !currentOwnerId) return;
+    const { error } = await saveNotificationEmail({ ownerId: currentOwnerId, email });
+    statusEl.hidden = false;
+    statusEl.textContent = error
+      ? "That didn't save — check your connection and try again."
+      : "Saved — alerts will also go to this email.";
+  });
+}
+
 async function refreshAll() {
   await refresh();
   const member = await refreshThisDeviceMember();
@@ -200,6 +213,7 @@ async function main() {
   await getCurrentIdentity(); // ensures an anonymous session exists for a brand-new device
 
   wirePushPrompt();
+  wireNotifyEmail();
   document.getElementById("chat-panel-close").addEventListener("click", closeChat);
 
   const inviteCode = new URLSearchParams(window.location.search).get("invite");
@@ -218,6 +232,8 @@ async function main() {
 
   document.getElementById("dispatch-list-section").hidden = false;
   await refreshAll();
+  const { data: contact } = await getMyNotificationEmail();
+  if (contact?.email) document.getElementById("notify-email").value = contact.email;
   window.setInterval(refresh, POLL_INTERVAL_MS);
   window.setInterval(refreshAll, POLL_INTERVAL_MS * 3); // comfort/nav/push-prompt change less often
 }

@@ -93,14 +93,22 @@ if this project gets a "real" Spec Kit pass again rather than incremental chat-d
    just app-level)? Does `push_subscriptions` have a row for that device (`select * from
    push_subscriptions`)? Check the `send-push` Edge Function's logs (`query_logs` MCP tool,
    source `function_edge_logs`) for the actual invocation and any error.
+1b. **Email notifications (via Resend) exist now too, same caveat — untested end-to-end.**
+   Deliberately a second, independent channel from push (see §4's most recent entry for why):
+   `notification_contacts` (own table, decoupled from Supabase Auth's email entirely) holds
+   where to send it; `send-push`'s Edge Function sends via Resend's API using
+   `onboarding@resend.dev` as the sender (no domain verification done — that's a real limitation
+   worth revisiting if deliverability/spam-folder issues show up). No email has been confirmed
+   to actually arrive in an inbox yet.
 2. **`supabase/tests/rls-and-transitions.test.js` hasn't been updated** for any of migrations
-   0002 through 0007 — it only exercises the original 0001 schema.
-3. **Chat/push secrets aren't in this repo, by design.** The VAPID private key and the
-   DB→Edge-Function webhook secret live only in Supabase Vault (`vault.decrypted_secrets`,
-   names `vapid_private_key` / `push_webhook_secret`) — 0005's migration file has a comment
-   explaining this rather than the actual `vault.create_secret()` calls (re-running those on a
-   fresh apply would error, since the names already exist). The VAPID **public** key is not
-   secret and is hardcoded in both `api-client.js` and `supabase/functions/send-push/index.ts`.
+   0002 through 0008 — it only exercises the original 0001 schema.
+3. **Chat/push/email secrets aren't in this repo, by design.** The VAPID private key, the
+   DB→Edge-Function webhook secret, and the Resend API key live only in Supabase Vault
+   (`vault.decrypted_secrets`, names `vapid_private_key` / `push_webhook_secret` /
+   `resend_api_key`) — 0005's and 0008's migration files have comments explaining this rather
+   than the actual `vault.create_secret()` calls (re-running those on a fresh apply would error,
+   since the names already exist). The VAPID **public** key is not secret and is hardcoded in
+   both `api-client.js` and `supabase/functions/send-push/index.ts`.
 4. **Anonymous Sign-Ins, once a blocker, now work fine** — resolved a few sessions ago. Don't
    assume it's broken by default anymore; if auth-dependent features ever fail again, `select
    count(*) from auth.users` is the fastest way to check.
@@ -108,12 +116,40 @@ if this project gets a "real" Spec Kit pass again rather than incremental chat-d
    offline (or the delete call fails), the local copy is gone immediately but the remote
    row/photo can be left behind — deletes aren't retried like creates are (see
    `js/db/memory-store.js`'s `deleteMemory`). A deliberate scope cut, not an oversight.
+6. **The owner's Redmi 15 has an unresolved data-loss problem** (MIUI appears to be clearing
+   site storage between launches, wiping the local Supabase session and creating a brand-new
+   empty anonymous account each time). Her real account/data is still intact server-side
+   (`e67e5c72-26d9-4de3-9ef2-ad4992ab0627` as of this writing — confirm it's still the one
+   `support_network_members` and the bulk of `memories`/`dispatches`/`comfort_entries` point
+   to). A visible "Account ID" was added to Profile (bottom of page) specifically so a fresh
+   session on her device can be identified and its `owner_id` manually migrated back onto the
+   real account's data via SQL — safe (touches ordinary data columns, not Auth internals), but
+   was NOT done as of this session because the Account ID was never provided. If this comes up
+   again: get that ID, then update `owner_id` on `dispatches`/`comfort_entries`/`memories`
+   /`support_network_members` from the old orphaned real-data id to whatever her current one is
+   — or vice versa, whichever she's actively using when you do it.
 
 ---
 
 ## 4. Recent debugging/feature history (most recent session first)
 
-**Most recent session — chat, push notifications, and a real two-tab partner app:**
+**Most recent session — diagnosed the Redmi 15 data-loss issue, added email notifications:**
+Traced "app keeps losing everything" on the owner's device to local session churn (confirmed
+via `auth.users`: two brand-new anonymous accounts created minutes apart on her phone). Her
+real data was never actually lost, just orphaned under an account her phone could no longer
+authenticate as — see §3, item 6 for the still-open reconnection step. Also built:
+- `notification_contacts` table + a Resend integration in the `send-push` Edge Function, so
+  alerts go out by email as a channel independent of push (which depends on the browser/OS
+  keeping a service worker alive — exactly what's unreliable on the device that started this).
+  Deliberately NOT reusing Supabase Auth's own email system, since that's the same broken,
+  rate-limited path "Back up my account" already depends on.
+- Investigated directly provisioning a password on the owner's real (orphaned) account via raw
+  SQL against `auth.users`/`auth.identities`, as a way to bypass broken email entirely — decided
+  against it: unsupported, version-sensitive, and impossible to verify without being able to
+  test a real login, so a mistake could lock her out worse than the current state. If a future
+  session considers this again, that risk assessment still applies unless something changes.
+
+**Earlier — chat, push notifications, and a real two-tab partner app:**
 Account owner asked for: (1) real notifications with delivery/read receipts and two-way
 replies "same as a WhatsApp chat", and (2) the partner side restructured to mirror the owner's
 — a Requests tab (with chat per request) and a Timeline tab (with upload). Built:
@@ -284,6 +320,7 @@ supabase/migrations/
                                             #   uploads, pg_net webhook wiring (secrets NOT included)
   0006_push_secrets_rpc.sql                # locked-down RPC the edge function uses to read Vault
   0007_dispatch_messages_update_policy_fix.sql   # tightened an overly-permissive RLS policy
+  0008_notification_email_contacts.sql     # notification_contacts table + Resend key in secrets RPC
 supabase/tests/                      # RLS/transition tests — only covers 0001 (see §3)
 tests/unit/*.test.html               # browser-run assertion pages, open directly
 
