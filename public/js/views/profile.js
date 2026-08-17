@@ -126,6 +126,8 @@ async function main() {
   wireEmailLink();
   wirePushToggle();
   await refreshPushUi();
+  const { ownerId } = await getCurrentIdentity();
+  document.getElementById("account-id").textContent = ownerId || "Not available yet — try again in a moment.";
 }
 
 main();
