@@ -25,12 +25,33 @@
         <p id="accept-error" class="micro" style="color: var(--color-danger)" hidden></p>
       </section>
 
+      <!-- Shown when there's no invite code in the URL and no valid membership on this device
+           — e.g. a stray bookmark, or a link that lost its ?invite= param along the way.
+           Previously this case fell through silently to an empty "Requests for you" with a
+           notification prompt and nothing else, which looked broken rather than explaining
+           what was actually wrong. -->
+      <section id="no-access-section" class="stack" hidden>
+        <h1>This page isn't connected to anything yet</h1>
+        <p>
+          This is the support-person view, and it only works when opened from a specific
+          invite link.
+        </p>
+        <p class="micro">
+          Looking for your own Crave &amp; Care app instead?
+          <a href="index.html">Tap here to open it.</a>
+        </p>
+        <p class="micro">
+          If someone sent you an invite link to help with cravings, try opening that exact link
+          again rather than this page directly.
+        </p>
+      </section>
+
       <div id="push-prompt" class="card stack" hidden>
         <p class="micro">Get notified the moment a new request comes in, or a reply arrives.</p>
         <button class="btn btn-outline btn-block" id="enable-push-btn">Enable notifications</button>
       </div>
 
-      <div class="card stack">
+      <div id="notify-email-card" class="card stack" hidden>
         <div class="field">
           <label for="notify-email">Also email me alerts at</label>
           <input type="email" id="notify-email" placeholder="you@example.com" />

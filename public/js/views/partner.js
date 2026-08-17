@@ -230,7 +230,19 @@ async function main() {
     return;
   }
 
+  // No invite code in the URL, and no locally-accepted (still-accepted, not since revoked)
+  // membership either — there's nothing to show. This happens opening partner.html directly
+  // (a stray bookmark, a link that lost its ?invite= param, or the owner's own device landing
+  // here by mistake). Previously this fell through silently to an empty "Requests for you"
+  // with a notification prompt and no explanation, which looked broken rather than saying
+  // what was actually wrong.
+  if (!inviteCode && (!existingMember || existingMember.status !== "accepted")) {
+    document.getElementById("no-access-section").hidden = false;
+    return;
+  }
+
   document.getElementById("dispatch-list-section").hidden = false;
+  document.getElementById("notify-email-card").hidden = false;
   await refreshAll();
   const { data: contact } = await getMyNotificationEmail();
   if (contact?.email) document.getElementById("notify-email").value = contact.email;
